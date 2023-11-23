@@ -169,9 +169,10 @@ find_cutoff <- function(model, data, target_variable, min_cutoff=0.1, max_cutoff
   
   pl <- ggplot(data=metrics_long, aes(x=cutoffs, y=value, colour=variable)) +
     geom_line(size=1) +
-    scale_colour_discrete(name ="Metric",
-                          breaks=c("precisions", "recalls"),
-                          labels=c("Precision", "Recall")) +
+    scale_colour_manual("Metric", 
+                        breaks=c("precisions", "recalls"),
+                        labels=c("Precision", "Recall"),
+                        values = c(my_palette[c(4,7)])) +
     labs(title='Precision & recall rates',
          subtitle='as functions of the cutoff',
          x='Cutoff', y='') +
@@ -193,7 +194,7 @@ find_classwt <- function(data) {
     forest <- randomForest(as_factor(is_fraud) ~ amt + age + category_fraud + hour_fraud,
                            data=data, ntree=100, classwt = c('0' = t, '1' = 1-t))
     # confusion matrix for the model
-    conf_mat <- confusion_matrix_rf(forest, data, 'is_fraud')
+    conf_mat <- confusion_matrix(forest, data, 'is_fraud', model_type = "forest")
     recalls <- c(recalls, conf_mat[2])
     precisions <- c(precisions, conf_mat[1])
   }
@@ -206,9 +207,10 @@ find_classwt <- function(data) {
   metrics_long <- melt(metrics, id='weights')
   pl <- ggplot(data=metrics_long, aes(x=weights, y=value, colour=variable)) +
     geom_line(size=1) +
-    scale_colour_discrete(name ="Metric",
-                          breaks=c("precisions", "recalls"),
-                          labels=c("Precision", "Recall")) +
+    scale_colour_manual("Metric", 
+                        breaks=c("precisions", "recalls"),
+                        labels=c("Precision", "Recall"),
+                        values = c(my_palette[c(4,7)])) +
     labs(title='Precision & recall rates',
          subtitle='as functions of the class weight (weight of the "0" class)',
          x='weight', y='') +

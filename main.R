@@ -1,4 +1,4 @@
-dev.off()
+# dev.off()
 main_path <- dirname(rstudioapi::getActiveDocumentContext()$path)
 setwd(main_path)
 
@@ -29,35 +29,15 @@ data_train[, trans_date_trans_time := strptime(trans_date_trans_time,
                                                tz = "EST")]
 
 #### Exploratory Data Analysis  ------------------------------------------------
-# Compute age of the customer in a day of transaction
+# Compute age of the customer ina day of transaction
 data_train[, age := round(as.numeric(difftime(trans_date_trans_time, dob, units = "days")/365), 0)]
 
-text_size <- 20
-# customize my_style settings
-my_style <-  theme_light() + 
-  theme(
-    legend.position = 'none',
-    plot.subtitle = element_text(size = text_size - 8, colour='black'),
-    plot.title = element_text(size = text_size, face = 'bold'),
-    axis.text=element_text(size=text_size - 4), 
-    axis.title.y = element_text(size = text_size - 4), 
-    axis.title.x = element_text(size = text_size - 4),
-    legend.background = element_rect(fill = "white"),
-    panel.grid.major = element_line(color=NA),
-    panel.grid.minor = element_blank(),
-    panel.background = element_rect(fill = "white")
-  ) 
-# define my palette colors
-my_palette <- c("#D73027", "#FDAE61", "#FFFFBF", 
-                         "#A50026", '#ABD9E9', '#4575B4', 
-                         '#313695', 'black', "lawngreen")
-                         
 ggplot(data_train, aes(x = is_fraud, y = age)) +
   geom_boxplot() +
   my_style +
   labs(title = "Boxplot for age of Customer",
        subtitle="group by not-fraudulent transactions and fraudulent transactions")
-  
+
 # Frequency of fraudulant transaction group by gender
 gender_fraud <- data_train %>% 
   .[, .(count = .N), by = c("gender", "is_fraud")] %>%
@@ -71,26 +51,12 @@ ggplot(gender_fraud, aes(x = gender, y = freq, fill = gender)) +
   labs(title = "Frequency of fraud group by gender",
        x = "",
        y = "")
-  
+
 # Amount of money spent on the transaction
 ggplot(data_train, aes(x = is_fraud, y = amt)) +
   geom_boxplot() +
   my_style
 # as we have plenty of outliers the figure is unreadable, lets remove the outliers and make a plot
-
-remove_outlier <- function(data, column) {
-  
-  IQR <- quantile(data[, get(column)], 0.75) - quantile(data[, get(column)], 0.25) # IQR= Q3 (75% quantile) – Q1 (25% quantile)
-  # Outlier would be a point below [Q1- (1.5)IQR] or above [Q3+(1.5)IQR]
-  l <- quantile(data[, get(column)], 0.25) - 1.5*IQR
-  r <- quantile(data[, get(column)], 0.75) + 1.5*IQR
-  
-  data <- data %>%
-    .[get(column) >= l & get(column) <= r]
-  
-  return(data)
-  
-}
 
 ggplot(remove_outlier(data_train, "amt"), 
        aes(x = is_fraud, y = amt)) +
@@ -175,7 +141,6 @@ woe_table <- woe(data_train[, ..categorical_cols],
                  zeroadj = 1)
 
 # Adding bin variables
-
 data_train[, weekday_fraud := if_else(week_day_of_trans %in% 4:7, 1, 0)]
 data_train[, category_fraud := 
              if_else(category %in% c('grocery_pos', 'misc_net', 'shopping_net', 'shopping_pos'), 1, 0)]
@@ -204,88 +169,22 @@ ggcorr(data_train[, ..temp], label = T)
 corrplot::corrplot(cor(data_train[, ..temp]), method = 'number')
 
 ####  Logistic regression  -----------------------------------------------------
+set.seed(125)
 data_train_bin_cv <- resample_partition(data_train_bin, p = c(valid = 0.3, train = 0.7))
 train_bin_cv <- data_train_bin[data_train_bin_cv$train$idx,]
 valid_bin_cv <- data_train_bin[data_train_bin_cv$valid$idx,]
 
 logreg <- glm(is_fraud ~ 
                 category_fraud + amt + hour_fraud + age:hour_fraud + amt:hour_fraud + amt:category_fraud + age:category_fraud,
-               data = train_bin_cv, family = binomial)
+              data = train_bin_cv, family = binomial)
 summary(logreg)
-
-# a function computing confusion matrix - based on lecture materials
-confusion_matrix <- function(model, data, col, cutoff=0.5) {
-  
-  predictScore <- predict(object=model, type='response',newdat=data) # calculating prediction scores
-  predic <- if_else(predictScore > cutoff, 1, 0) # assigning predictions
-  confmat <- table(predic, data[[col]])
-  rownames(confmat) <- c('pred_negative', 'pred_positive')
-  colnames(confmat) <- c('obs_negative', 'obs_positive')
-  print(confmat) # printing the confusion matrix
-  precision <- confmat[2,2]/(confmat[2,1]+confmat[2,2]) # precision = TP/(TP+FP)
-  recall <- confmat[2,2]/(confmat[1,2]+confmat[2,2]) # recall = TP/(TP+FN)
-  print(paste('Precision: ',precision))
-  print(paste('Recall: ', recall))
-  return(c(precision, recall))
-}
-
-confusion_matrix_rf <- function(model, data, col, cutoff=0.5){
-  predictScore <- as.numeric(predict(object=model, type='response',newdat=data)) -1
-  predic <- ifelse(predictScore > cutoff, 1, 0)
-  confmat <- table(predic, data[[col]])
-  rownames(confmat) <- c('pred_negative', 'pred_positive')
-  colnames(confmat) <- c('obs_negative', 'obs_positive')
-  print(confmat)
-  precision <- confmat[2,2]/(confmat[2,1]+confmat[2,2])
-  recall <- confmat[2,2]/(confmat[1,2]+confmat[2,2])
-  print(paste('Precision: ',precision))
-  print(paste('Recall: ', recall))
-  return(c(precision, recall))
-}
-
-confusion_matrix(logreg, train_bin_cv, col = "is_fraud", cutoff = 0.003)
-confusion_matrix(logreg, valid_bin_cv, col = "is_fraud", cutoff = 0.003)
-
-# looking for the most reasonable cutoff for a model - the function produces a plot
-find_cutoff <- function(model, data, target_variable, min_cutoff=0.1, max_cutoff=0.8, by=0.05) {
-  
-  cutoffs <- seq(min_cutoff, max_cutoff, by=by)
-  precisions <- numeric(0)
-  recalls <- numeric(0)
-  
-  for(x in cutoffs){
-    # confusion matrix for the model with cutoff = x
-    conf_mat <- confusion_matrix(model, data, target_variable, x)
-    precisions <- c(precisions, conf_mat[1])
-    recalls <- c(recalls, conf_mat[2])
-  }
-  # preparation for a plot
-  metrics <- data.table(
-    cutoffs = cutoffs,
-    precisions = precisions,
-    recalls = recalls
-  )
-  
-  metrics_long <- melt(metrics, id='cutoffs')
-  
-  pl <- ggplot(data=metrics_long, aes(x=cutoffs, y=value, colour=variable)) +
-    geom_line(size=1) +
-    scale_colour_discrete(name ="Metric",
-                          breaks=c("precisions", "recalls"),
-                          labels=c("Precision", "Recall")) +
-    labs(title='Precision & recall rates',
-         subtitle='as functions of the cutoff',
-         x='Cutoff', y='') +
-    my_style +
-    theme(legend.position = c(0.9,0.9), axis.title.y = element_blank()) 
-  
-  return(pl)
-}
 
 cutoff_lvl <- find_cutoff(logreg, train_bin_cv, 'is_fraud', 0.001, 0.1, 0.001)
 
-#### Logistic regression with PCA ----------------------------------------------
+conf_mat_logreg_train <- confusion_matrix(logreg, train_bin_cv, col = "is_fraud", cutoff = 0.003)
+conf_mat_logreg_valid <- confusion_matrix(logreg, valid_bin_cv, col = "is_fraud", cutoff = 0.003)
 
+#### Logistic regression with PCA ----------------------------------------------
 # remove dependent variable from dataset and keep only numerical variables
 numerical_cols <- c('amt', 'city_pop', 'age', 'dist', 'weekday_fraud', 'category_fraud', 'hour_fraud')
 data_bin_PCA <- data_train_bin %>% 
@@ -318,7 +217,7 @@ logreg_PCA <- glm(is_fraud ~
                     PC1 + PC2 + PC3 + PC4 + PC2*PC3 + PC1*PC4,
                   data = train_bin_cv_pca, family = binomial)
 summary(logreg_PCA)
-  
+
 cutoff_lvl_pca <- find_cutoff(logreg_PCA, train_bin_cv_pca, 'is_fraud', 0.001, 0.05, 0.001)
 
 confusion_matrix(logreg_PCA, train_bin_cv_pca, col = "is_fraud", cutoff = 0.003)
@@ -329,45 +228,7 @@ confusion_matrix(logreg_PCA, valid_bin_cv_pca, col = "is_fraud", cutoff = 0.003)
 train_cv <- data_train[data_train_bin_cv$train$idx,]
 valid_cv <- data_train[data_train_bin_cv$valid$idx,]
 
-# Searching best parameters for classwt
-find_classwt <- function(data) {
-  
-  recalls <- numeric(0)
-  precisions <- numeric(0)
-  
-  for(t in seq(0.05, 0.95, by=0.05)){
-    gc() # freeing unused memory
-    # fitting random forest with parameter classwt = t for class '0' and = 1-t for '1'
-    forest <- randomForest(as_factor(is_fraud) ~ amt + age + category_fraud + hour_fraud,
-                           data=data, ntree=100, classwt = c('0' = t, '1' = 1-t))
-    # confusion matrix for the model
-    conf_mat <- confusion_matrix_rf(forest, data, 'is_fraud')
-    recalls <- c(recalls, conf_mat[2])
-    precisions <- c(precisions, conf_mat[1])
-  }
-  # preparation for plotting
-  metrics <- tibble(
-    weights = seq(0.05, 0.95, by=0.05),
-    precisions = precisions,
-    recalls = recalls
-  )
-  metrics_long <- melt(metrics, id='weights')
-  pl <- ggplot(data=metrics_long, aes(x=weights, y=value, colour=variable)) +
-    geom_line(size=1) +
-    scale_colour_discrete(name ="Metric",
-                          breaks=c("precisions", "recalls"),
-                          labels=c("Precision", "Recall")) +
-    labs(title='Precision & recall rates',
-         subtitle='as functions of the class weight (weight of the "0" class)',
-         x='weight', y='') +
-    theme_classic() +
-    theme(legend.position = c(0.9,0.9), axis.title.y = element_blank()) +
-    theme(plot.subtitle = element_text(size = 9, colour='darkgrey'))
-
-  return(pl)
-}
-
-set.seed(123)
+set.seed(125)
 subset_tr <- sample_n(train_cv, 10^5)
 rf_params <- find_classwt(subset_tr)
 
@@ -376,11 +237,10 @@ forest <- randomForest(as_factor(is_fraud) ~ amt + age + category_fraud + hour_f
                        ntree=100, 
                        classwt = c('0' = 0.25, '1' = 0.75))
 
-confusion_matrix_rf(forest, train_cv, 'is_fraud')
-confusion_matrix_rf(forest, valid_cv, 'is_fraud')
+conf_mat_forest_train <- confusion_matrix(forest, train_cv, 'is_fraud', model_type = "forest")
+conf_mat_forest_valid <- confusion_matrix(forest, valid_cv, 'is_fraud', model_type = "forest")
 
 #### Cross validation - Logistic regression ------------------------------------
-
 # To check performance of the models, we sample a subset of the data, containing 1e5 observations
 set.seed(125)
 n_obs <- 1e5
@@ -422,31 +282,6 @@ precisions_all <- rbind(data.table(model = 'train_data',
                         data.table(model = 'test_data', 
                                    precisions = precisions_test))
 
-# Density plot of metrics
-cv_metrics_plt <- function(metrics, model_nm = "logistic regression") {
-  
-  metric_nm <- names(metrics)[2]
-  title_nm <- paste0("Density plot for ", metric_nm)
-  subtitle_nm <- paste("for ", model_nm)
-  
-  plt <- ggplot(as.data.frame(metrics), aes(get(metric_nm), colour = model, fill = model)) +
-    geom_density(alpha = 0.7) +
-    theme_light() +
-    theme(
-      plot.subtitle = element_text(size = text_size - 8, colour='black'),
-      plot.title = element_text(size = text_size, face = 'bold'),
-      axis.text=element_text(size=text_size - 4), 
-      axis.title.y = element_text(size = text_size - 4), 
-      axis.title.x = element_text(size = text_size - 4)
-    ) +
-    scale_fill_manual(values = c(my_palette[c(4,7)]))  + 
-    labs(title = title_nm,
-         subtitle = subtitle_nm,
-         y = "")
-  
-  return(plt)
-}
-
 cv_metrics_plt(recalls_all, "logistic regression")
 cv_metrics_plt(precisions_all, "logistics regression")
 
@@ -466,16 +301,16 @@ models <- map(cv_mc$train, ~ randomForest(as_factor(is_fraud) ~ amt + age + cate
                                           data=., ntree=100, classwt = c('0' = 0.25, '1' = 0.75)))
 
 recalls_train <- map2_dbl(models, cv_mc$train,
-                          ~confusion_matrix_rf(model=.x, data=as_tibble(.y), col='is_fraud')[2])
+                          ~confusion_matrix(model=.x, data=as_tibble(.y), col='is_fraud', model_type = "forest")[2])
 
 precisions_train <- map2_dbl(models, cv_mc$train,
-                             ~confusion_matrix_rf(model=.x, data=as_tibble(.y), col='is_fraud')[1])
+                             ~confusion_matrix(model=.x, data=as_tibble(.y), col='is_fraud', model_type = "forest")[1])
 
 recalls_test <- map2_dbl(models, cv_mc$test,
-                         ~confusion_matrix_rf(model=.x, data=as_tibble(.y), col='is_fraud')[2])
+                         ~confusion_matrix(model=.x, data=as_tibble(.y), col='is_fraud', model_type = "forest")[2])
 
 precisions_test <- map2_dbl(models, cv_mc$test,
-                            ~confusion_matrix_rf(model=.x, data=as_tibble(.y), col='is_fraud')[1])
+                            ~confusion_matrix(model=.x, data=as_tibble(.y), col='is_fraud', model_type = "forest")[1])
 
 recalls_all <- rbind(tibble(model = 'train_data', recalls = recalls_train),
                      tibble(model = 'test_data', recalls = recalls_test))
@@ -487,3 +322,38 @@ precisions_all <- rbind(tibble(model = 'train_data', precisions = precisions_tra
 cv_metrics_plt(recalls_all, "random forest")
 cv_metrics_plt(precisions_all, "random forest")
 
+#### Performance check on testing dataset --------------------------------------
+data_test <- fread("C:/Users/edyta/Desktop/GitHub/repos/credit_card_fraud_detection//Data/fraudTest.csv")
+
+# Logistic regression
+data_test_logreg <- data_preprocess_logreg(data_test)
+logreg <- glm(is_fraud ~ 
+                category_fraud + amt + hour_fraud + age:hour_fraud + amt:hour_fraud + amt:category_fraud + age:category_fraud,
+              data = data_test_logreg, family = binomial)
+summary(logreg)
+
+conf_mat_logreg_test <- confusion_matrix(logreg, data_test_logreg, col = "is_fraud", cutoff = 0.003)
+conf_mat_logreg_test
+
+# Random forest
+data_test_forest <- data_preprocess_forest(data_test)
+forest <- randomForest(as_factor(is_fraud) ~ amt + age + category_fraud + hour_fraud,
+              data = data_test_forest, ntree=100, classwt = c('0' = 0.25, '1' = 0.75))
+summary(forest)
+
+conf_mat_forest_test <- confusion_matrix(forest, data_test_forest, col = "is_fraud", cutoff = 0.0025, model_type = "forest")
+conf_mat_forest_test
+
+#### Conclusion  ---------------------------------------------------------------
+model <- c('logistic regression', 'random forest')
+quality <- c('not overfited', 'significantly overfited')
+recall_train <- c(round(conf_mat_logreg_train[2], 3),round(conf_mat_forest_train[2],3))
+precision_train <- c(round(conf_mat_logreg_train[1], 3),round(conf_mat_forest_train[1],3))
+recall_test <- c(round(conf_mat_logreg_test[2], 3),round( conf_mat_forest_test[2],3))
+precision_test <- c(round(conf_mat_logreg_test[1], 3),round( conf_mat_forest_test[1],3))
+tbl <- tibble(Model = model,
+              Quality = quality,
+              Recall_train = recall_train,
+              Precision_train = precision_train,
+              Recall_test = recall_test,
+              Precision_test = precision_test)
