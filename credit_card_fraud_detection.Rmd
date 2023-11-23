@@ -1,0 +1,860 @@
+---
+title: "Credit card transactions fraud detection"
+author: "Edyta Pietrucha & Anna Wieczorek"
+date: "24.01.2022"
+geometry: "left=2cm,right=2cm,top=2cm,bottom=2cm"
+documentclass: report
+output:
+  pdf_document:
+    number_sections: yes
+    keep_tex: yes
+---
+
+\tableofcontents
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+```
+
+# Introduction
+The project will be run with R and we will be using the following libraries:
+
+```{r libraries, include=TRUE}
+main_path <- dirname(rstudioapi::getActiveDocumentContext()$path)
+setwd(main_path)
+library(ggplot2)
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(modelr)
+library(klaR)
+library(GGally)
+library(randomForest)
+library(gridExtra)
+```
+```{r path, include=FALSE}
+main_path <- "C:/Users/edyta/Desktop/GitHub/repos/credit_card_fraud_detection/"
+```
+
+```{r functions, include=FALSE}
+source("functions.R")
+```
+
+First, let us explain, what a credit card fraud is. We will call unauthorized credit card transactions as **frauds**. It is a serious problem, especially in the modern era, due to very easy to perform internet transactions. Although banks introduced two-step verification for shopping online, there are still people, who will find new ways to use someone's money.
+
+In the project we will focus on finding a model, that suites the fraud detection best and it will be done with respect to two metrics - recall and precision.
+
+```{=latex}
+$$ recall = \frac{TP}{TP+FN}$$
+$$ precision = \frac{TP}{TP+FP}$$
+```
+We will try to maximize recall, but also try to keep precision on a reasonable level.
+
+# Data description
+
+Data input:
+
+```{r data input}
+data_train <- fread(paste0(main_path, "/Data/fraudTrain.csv"))
+data_test <- fread(paste0(main_path, "Data/fraudTest.csv"))
+```
+
+The aim of this paper is to predict whether a transaction is fraudulent or not. Database which we will use is a simulated credit card transaction dataset containing legitimate and fraud transactions from the duration 1st Jan 2019 - 31st Dec 2020. This was generated using Sparkov Data Generation tool. 
+
+Database is available on kaggle (see the link below):
+
+<https://www.kaggle.com/kartik2112/fraud-detection/version/1?select=fraudTrain.csv>
+
+Dataset has `r nrow(data_train)` observations and `r ncol(data_train)` columns. 
+
+Columns of the dataset:
+
+* index - Unique Identifier for each row
+* transdatetrans_time - Transaction DateTime
+* cc_num - Credit Card Number of Customer
+* merchant - Merchant Name
+* category - Category of Merchant
+* amt - Amount of Transaction
+* first - First Name of Credit Card Holder
+* last - Last Name of Credit Card Holder
+* gender - Gender of Credit Card Holder
+* street - Street Address of Credit Card Holder
+* city - City of Credit Card Holder
+* state - State of Credit Card Holder
+* zip - Zip of Credit Card Holder
+* lat - Latitude Location of Credit Card Holder
+* long - Longitude Location of Credit Card Holder
+* city_pop - Credit Card Holder's City Population
+* job - Job of Credit Card Holder
+* dob - Date of Birth of Credit Card Holder
+* trans_num - Transaction Number
+* unix_time - UNIX Time of transaction
+* merch_lat - Latitude Location of Merchant
+* merch_long - Longitude Location of Merchant
+* is_fraud - Fraud Flag (1 - fraudulent transaction, 0 - non-fraudulent transaction)
+
+We will predict the chances of a fraudulent transaction in function of the other variables.
+
+```{r summary, include=FALSE}
+summary(data_train)
+```
+
+Dataset contains `r length(unique(paste(data_train$first, data_train$last)))` different holders and `r length(unique(data_train$cc_num))` different credit card numbers which means that there are Customers who have more than one credit card. We notice that each transaction number is unique.
+
+Frequency of fraudulent transactions is approximately `r sum(data_train$is_fraud)/nrow(data_train)*100` %. The dataset has `r sum(is.na(data_train))` missing values.
+
+We notice that:
+
+* X - id of observation, not helpful at all,
+* first, last - name of each Holder will be individual and not helpful as such,
+* street, zip - we have a location parameters so we do not use this variables,
+* unix_time - we have transaction time which gives the same information,
+* trans_num - is individual for each transaction and not helpful as such.
+
+Therefore, we will remove those columns.
+
+```{r remove_columns}
+data_train <- data_train %>%
+  .[,-c("V1", "first", "last", "street", "zip", "unix_time", "trans_num")] 
+```
+
+# Data Wrangling
+
+First, we will look at the structure of our data, to check if the datatypes are correct.
+
+```{r structure}
+data_train %>%
+  str
+```
+
+We can see, that we will need to convert some variables to factors. 
+
+```{r converting}
+dt <- c("cc_num", "merchant", "category", "gender", "city", "state", "job", "is_fraud")
+data_train[,(dt):= lapply(.SD, as.factor), .SDcols = dt]
+```
+
+```{r ,,include=FALSE}
+rm(list=c('dt'))
+```
+
+We need to convert `trans_date_trans_time` and `dob` to date class for further analysis.
+
+```{r converting2}
+data_train[, dob := as.Date(dob)]
+data_train[, trans_date_trans_time := strptime(trans_date_trans_time,
+                                               format ="%Y-%m-%d %H:%M:%OS", 
+                                               tz = "EST")]
+```
+Now, let us look at the data structure again:
+
+```{r structure2}
+data_train %>%
+  str
+```
+
+And the types are correct now. 
+
+## Explanatory Data Analysis
+
+All functions used in project can be found in the Appendix.
+
+### Age
+
+We created a new variable which counts age of each Customer in a day of a transaction. We assume that age of a Holder can have an impact on detecting fraudulent transactions, especially combined with variables such as amount of money spent on a transaction or transacion time.
+
+```{r age}
+data_train[, age := round(as.numeric(difftime(trans_date_trans_time, dob, units = "days")/365), 0)]
+
+```
+
+Data visualization:
+```{r age_plot, fig.cap="\\label{Fig:age_plot}Boxplot for variable age group by not-fraudulent transactions and fraudulent transactions."}
+ggplot(data_train, aes(x = is_fraud, y = age)) +
+  geom_boxplot() +
+  my_style +
+  labs(title = "Boxplot for age of Customer",
+       subtitle="group by not-fraudulent transactions and fraudulent transactions")
+```
+Mean for fraudulent transactions is a little bit higher than for not-fraudulent transactions.
+
+### Gender
+
+Further analysis has led us to this conclusion that even though there are less men than women in our data, the number of frauds for men is slightly higher than for women.
+
+```{r gender}
+# checking a percentage of fraud transaction of each gender
+gender_fraud <- data_train %>% 
+  .[, .(count = .N), by = c("gender", "is_fraud")] %>%
+  .[, .(is_fraud, freq = count/sum(count)), by = gender] %>%
+  .[is_fraud == 1]
+gender_fraud
+```
+
+Visualize the data:
+
+```{r gender_plot , fig.cap="\\label{Fig:gender_plot}Frequency of fraudulent transactions group by gender."}
+ggplot(gender_fraud, aes(x = gender, y = freq, fill = gender)) +
+  geom_bar(stat = 'identity') +
+  my_style +
+  scale_fill_manual(values = c(my_palette[c(4,7)])) +
+  labs(title = "Frequency of fraud group by gender",
+       x = "",
+       y = "")
+```
+```{r ,include=FALSE}
+rm('gen_fraud')
+```
+
+### Amt
+
+Variable `amt` corresponds to the amount of money spent on each transaction. We assume that this information can have a huge impact to detect if a transaction is fraudulent. Let's see basic statistics for `amt`.
+
+```{r amt, include=FALSE}
+data_train %>% 
+  .[, .("mean_amount" = mean(amt), "median" = median(amt), "min" = min(amt), "max" = max(amt)), by = is_fraud]
+```
+Mean and median amount of fraudulent transactions are higher than for not-fraudulent transactions.
+
+We would like to create a boxplot to visualize datapoints, but we detected to much outliers in observations for not-fraudlent transactions. To deal with that problem we created our own function which removes outliers from a dataset.
+
+```{r remove_outliers}
+remove_outlier <- function(data, column) {
+  
+  IQR <- quantile(data[, get(column)], 0.75) - quantile(data[, get(column)], 0.25) # IQR= Q3 (75% quantile) – Q1 (25% quantile)
+  # Outlier would be a point below [Q1- (1.5)IQR] or above [Q3+(1.5)IQR]
+  l <- quantile(data[, get(column)], 0.25) - 1.5*IQR
+  r <- quantile(data[, get(column)], 0.75) + 1.5*IQR
+  
+  data <- data %>%
+    .[get(column) >= l & get(column) <= r]
+  
+  return(data)
+  
+}
+```
+
+```{r amt_plot, fig.cap="\\label{Fig:amt_plot}Boxplot for variable amt group by not-fraudulent transactions and fraudulent transactions."}
+ggplot(remove_outlier(data_train, "amt"), 
+       aes(x = is_fraud, y = amt)) +
+  geom_boxplot() +
+  my_style +
+  labs(title = "Boxplot for amount spent on the transaction",
+       subtitle = "group by not-fraudulent transactions and fraudulent transactions")
+```
+
+Graphic analysis confirms our assumptions that the variable `amt` can be really important for aim of our project.
+
+### Weekday of transaction
+
+We think, that the weekday of a transaction could be an important indicator of fraudulent transactions, especially when combined with other variables like the amount of money spent on purchase or the transaction hour.
+So we decided to create a variable `week_day_trans` to conduct the analysis.
+
+```{r week_day_trans}
+data_train[, week_day_of_trans := as.factor(wday(trans_date_trans_time))]
+```
+
+```{r, week_day_prepare, include=TRUE}
+week_day_fraud <- data_train %>% 
+  .[, .(count = .N), by = c("week_day_of_trans", "is_fraud")] %>%
+  .[, .(is_fraud, freq = count/sum(count)), by = week_day_of_trans] %>%
+  .[is_fraud == 1]
+```
+
+Once we have created the variable, we can look at the frequency of frauds on each day.
+On Mondays and Tuesdays the odds of a fraudulent transactions are slightly lower than on the other days.
+
+```{r weekday_plot, fig.cap="\\label{Fig:weekday_plot}Frequancy of fraudulent transactions grouped by the weekday."}
+ggplot(week_day_fraud, aes(x = week_day_of_trans, y = freq, fill = week_day_of_trans)) +
+  geom_bar(stat = 'identity') +
+  my_style +
+  scale_fill_manual(values = c(my_palette[1:7])) +
+  labs(title = "Frequency of fraud group by weekday of the transaction",
+       x = "",
+       y = "") +
+  scale_x_discrete(labels=c("Monday", "Tuesday", "Wednesday", "Thursday",
+                            "Friday", "Saturday", "Sunday"))
+```
+```{r, include=FALSE}
+rm(week_day_fraud)
+```
+### Category of Purchase
+
+Investigating the data, we see that some categories, that is: *grocery_pos*, *misc_net*, *shopping_net* and *shopping_pos*, seem to be more vulnerable to fraudulent transactions than others.
+
+```{r, category_prepare, include=TRUE}
+category_fraud <- data_train %>% 
+  .[, .(count = .N), by = c("category", "is_fraud")] %>%
+  .[, .(is_fraud, freq = count/sum(count)), by = category] %>%
+  .[is_fraud == 1]
+```
+
+
+```{r category_plot, fig.cap="\\label{Fig:category_plot}Frequancy of fraudulent transactions grouped by the category of purchase."}
+ggplot(category_fraud, aes(x = category, y = freq, fill = category)) +
+  geom_bar(stat = 'identity') +
+  my_style +
+  labs(title = "Frequency of fraud group by category of merchant",
+       x = "",
+       y = "") +
+  coord_flip()
+```
+```{r, include=FALSE}
+rm(category_fraud)
+```
+We can see this phenomenon on the Figure \ref{Fig:category_plot}.
+
+### Transaction date, transaction time
+
+Let us dive into transaction date and time in more details. First, we will create a variable `trans_hour` and see if at any time of the day, such as late night, chance of fraud is higher.
+
+```{r trans_hour}
+data_train[, trans_hour := as_factor(strftime(trans_date_trans_time, 
+                                              format="%H", 
+                                              tz = "EST"))]
+```
+```{r trans_hour_prepare, include=TRUE}
+hour_fraud <- data_train %>%
+  .[, .(count = .N), by = c("trans_hour", "is_fraud")] %>%
+  .[, .(is_fraud, freq = count/sum(count)), by = trans_hour] %>%
+  .[is_fraud == 1]
+```
+
+As expected, at night the frequency of frauds is much higher than during a day. This insight, combined with the age of a Holder can be very important for our model. For example, it is much more likely that a younger person will be buying something at night, than an elderly one.
+
+```{r hour_fraud_plot, fig.cap="\\label{Fig:hour_fraud_plot}Frequancy of fraudulent transactions grouped by the transaction hour."}
+ggplot(hour_fraud, aes(x = trans_hour, y = freq, fill = trans_hour)) +
+  geom_bar(stat = 'identity') +
+  my_style +
+  labs(title = "Frequency of fraud group by transaction hour",
+       x = "",
+       y = "") +
+  coord_flip()
+```
+```{r, include=FALSE}
+rm(hour_fraud)
+```
+The analysis also shown, that month of a transaction is not very important.
+
+### Distance
+
+Now we will take a look at the distance between the home of a Holder and the place of a Merchant. We will compute the distance based on `lat`, `long`, `merch_lat` and `merch_long` variables, that give us geo-coordinates for the places, using the formula:
+$$distance = \sqrt{(long-merch\ long)^2 + (lat-merch\ lat)^2}$$
+
+```{r dist}
+data_train[, dist := sqrt((long-merch_long)^2 + (lat-merch_lat)^2)]
+
+```
+
+```{r dist_plot, fig.cap="\\label{Fig:dist_plot}Boxplot of distance between the home of a Holder and the place of a Merchant, grouped by is_fraud."}
+ggplot(data_train, aes(x = is_fraud, y = dist)) +
+  geom_boxplot() +
+  my_style +
+  labs(title = "Boxplot for distance between the home of a Holder and the place of a Merchant",
+       subtitle = "group by not-fraudulent transactions and fraudulent transactions")
+
+```
+
+The boxplot shows no significant difference in distance for fraudulent and non-fraudulent transactions.
+
+## Data binning
+
+Keeping in mind the analysis described above, we will bin some categorical variables, so that we have less categories (and less variables in a model), but still have much information, that the columns provide.
+
+### Information Value
+
+We will perform binning with respect to Information Value and Weight of Evidence provided by function `WOETable` form a package `InformationValue` (code is based on the lecture materials).
+
+```{r woe}
+categorical_cols <- c()
+for (col in colnames(data_train %>% .[, -c("cc_num", "is_fraud")])) {
+  
+  if(is.factor(data_train[[col]])) {
+    categorical_cols <- c(categorical_cols, col)
+  }
+  
+}
+
+woe_table <- woe(data_train[, ..categorical_cols], 
+                 as.factor(data_train$is_fraud),
+                 zeroadj = 1)
+woe_table
+```
+
+`job`, `merchant`, `city` and `category` seem to have high value, but they also have many categories (leading to higher sum of IV). `gender` performs poorly and that is a little bit surprising, giving the difference in fraud/non-fraud proportions. 
+
+
+Taking a look at the separate WOE tables for each variable, we can conclude that particular jobs have low IV, the same can be observed for `city`. For `category` the table looks better, we will work with this variable and with `trans_hour`. For `state`, `week_day_trans` and `gender` the results are rather poor, although we will try to work on the weekday of transaction.
+
+Now, we will apply the results combined with analysis of the plots shown earlier and bin some variables.
+
+```{r bins}
+data_train[, weekday_fraud := if_else(week_day_of_trans %in% 4:7, 1, 0)]
+data_train[, category_fraud := 
+             if_else(category %in% c('grocery_pos', 'misc_net', 'shopping_net', 'shopping_pos'), 1, 0)]
+data_train[, hour_fraud := 
+             if_else(trans_hour %in% c('00', '01', '02', '03', '22', '23'), 1, 0)]
+data_train[,c("weekday_fraud", "category_fraud", "hour_fraud"):= 
+             lapply(.SD, as.factor), .SDcols = c("weekday_fraud", "category_fraud", "hour_fraud")]
+```
+
+We can also drop more variables (for binned and unbinned data):
+
+* lat, long, merch_lat, merch_long - beacause they were used to create `dist` and we do not need them anymore,
+* cc_num - we will not use credit card number,
+* merchant - there are too many categories (`r length(unique(data_train$merchant))`),
+* dob - date of birth of a Holder will not be used, as we have created the age variable,
+* trans_date_trans_time - was needed only to create `trans_hour`.
+
+Also, we will add binned variables to `data`, because we will perform normalization and our data is too big to keep all three datasets with original, binned and normalized data.
+
+```{r drop, include=FALSE}
+data_train <- data_train %>% 
+  .[,-c('lat','long','merch_lat','merch_long','cc_num','merchant', 'dob', 'trans_date_trans_time')]
+```
+
+## Normalization
+
+As mentioned before, we will not create another dataset with unbinned and normalized data, because it is too big and takes too much memory to keep it. So let us normalize `data_bin` and leave `data` in its original ranges.
+
+To perform normalization, we will use a function `min_max_norm` from lecture materials.
+
+```{r normalization}
+min_max_norm <- function(x) {
+  (x - min(x, na.rm = T)) / (max(x, na.rm = T) - min(x, na.rm = T))
+}
+
+temp <- c('amt','city_pop','age','dist')
+data_train_bin <- copy(data_train)
+data_train_bin[, (temp) := lapply(.SD, min_max_norm), .SDcols = temp] # reference!
+```
+
+## Correlation
+
+```{r correlation, fig.cap="The correlation structure of the data."}
+ggcorr(data_train[, ..temp], label = T)
+```
+
+Correlation is very low for all numerical variables.
+
+# Models
+
+## Cross Validation
+
+To investigate how well the model is dealing with new datapoints we set 20% of the data aside for cross validation. We make it on both datasets with normalized data and not-normalized data.
+
+
+```{r train_valid}
+set.seed(125)
+data_train_bin_cv <- resample_partition(data_train_bin, p = c(valid = 0.3, train = 0.7))
+train_bin_cv <- data_train_bin[data_train_bin_cv$train$idx,]
+valid_bin_cv <- data_train_bin[data_train_bin_cv$valid$idx,]
+```
+## The base model
+
+### Logistic regression
+
+As a base model we will consider logistic regression with variables which give the best results after investigation.
+ 
+
+```{r logreg}
+logreg <- glm(is_fraud ~ 
+                category_fraud + amt + hour_fraud + age:hour_fraud + amt:hour_fraud + 
+                amt:category_fraud + age:category_fraud,
+              data = train_bin_cv, family = binomial)
+summary(logreg)
+```
+
+We would like to point out that we are focusing on maximizing recall, but also try to keep precision on a reasonable level. To check the model we created a function which computes a confusion matrix and also gives us values for recall and precision.
+
+```{r confusion_matrix}
+confusion_matrix <- function(model, data, col, cutoff=0.5, model_type = "logistic") {
+  
+  predictScore <- as.numeric(predict(object=model, type='response',newdat=data)) # calculating prediction scores
+  
+  if (model_type == "forest") predictScore = predictScore -1
+  
+  predic <- if_else(predictScore > cutoff, 1, 0) # assigning predictions
+  confmat <- table(predic, data[[col]])
+  
+  rownames(confmat) <- c('pred_negative', 'pred_positive')
+  colnames(confmat) <- c('obs_negative', 'obs_positive')
+  
+  precision <- confmat[2,2]/(confmat[2,1]+confmat[2,2]) # precision = TP/(TP+FP)
+  recall <- confmat[2,2]/(confmat[1,2]+confmat[2,2]) # recall = TP/(TP+FN)
+  
+  return(c(precision, recall))
+}
+```
+To fit the best model we create a function which produces a plot for precision and recall for each model by changing the value of parameter `cutoff` in the `glm` function.
+
+```{r cut_off}
+# looking for the most reasonable cutoff for a model - the function produces a plot
+find_cutoff <- function(model, data, target_variable, min_cutoff=0.1, max_cutoff=0.8, by=0.05){
+  cutoffs <- seq(min_cutoff, max_cutoff, by=by)
+  precisions <- numeric(0)
+  recalls <- numeric(0)
+  for(x in cutoffs){
+    # confusion matrix for the model with cutoff = x
+    conf_mat <- confusion_matrix(model, data, target_variable, x) 
+    precisions <- c(precisions, conf_mat[1])
+    recalls <- c(recalls, conf_mat[2])
+  }
+  # preparation for a plot
+  metrics <- tibble(
+    cutoffs = cutoffs,
+    precisions = precisions,
+    recalls = recalls
+  )
+  metrics_long <- melt(metrics, id='cutoffs')
+  pl <- ggplot(data=metrics_long, aes(x=cutoffs, y=value, colour=variable)) + 
+    geom_line(size=1) +
+    scale_colour_discrete(name  ="Metric",
+                          breaks=c("precisions", "recalls"),
+                          labels=c("Precision", "Recall")) +
+    labs(title='Precision & recall rates',
+         subtitle='as functions of the cutoff',
+         x='Cutoff', y='') +
+   theme_light() +
+    theme(
+      plot.subtitle = element_text(size = text_size - 4, colour='black'),
+      plot.title = element_text(size = text_size, face = 'bold'),
+      axis.text=element_text(size=text_size - 4), 
+      axis.title.y = element_text(size = text_size - 4), 
+      axis.title.x = element_text(size = text_size - 4),
+      legend.position = c(0.9,0.9)
+    )
+  # plotting
+  grid.arrange(pl, nrow=1, ncol=1)
+  
+}
+```
+
+```{r cutoff_lvl}
+find_cutoff(logreg, train_bin_cv, 'is_fraud', 0.001, 0.1, 0.001)
+```
+The function creates a graph, where we can we pick up a parameter optimal for us. We will go for value `0.03` as the best cutoff level which maximizes recall. 
+
+Let us look at the confusion matrix:
+```{r confusion_matrix_logreg}
+conf_mat_logreg_train <- 
+  confusion_matrix(logreg, train_bin_cv, col = "is_fraud", cutoff = 0.003)
+conf_mat_logreg_valid <- 
+  confusion_matrix(logreg, valid_bin_cv, col = "is_fraud", cutoff = 0.003)
+conf_mat_logreg_train
+conf_mat_logreg_valid
+```
+As a result we get on training dataset precision equals `r round(conf_mat_logreg_train[1],3)`, recall equals `r round(conf_mat_logreg_train[2],3)` and on testing dataset precision equals `r round(conf_mat_logreg_valid[1],3)`, recall equals `r round(conf_mat_logreg_valid[2],3)`. This model is a good contender, but in next consideration we will focus on getting higher precision with assuming high recall.
+
+## The Challenger models
+
+### Logistic regression with PCA
+
+First challenger model will be a logistic regression with application of Principal Component Analysis (PCA) on numerical variables.
+
+```{r PCA}
+# remove dependent variable from dataset and keep only numerical variables
+numerical_cols <- c('amt', 'city_pop', 'age', 'dist', 'weekday_fraud', 'category_fraud', 'hour_fraud')
+data_bin_PCA <- data_train_bin %>% 
+  .[, (numerical_cols):= lapply(.SD, as.numeric), .SDcols = numerical_cols] %>%
+  .[, ..numerical_cols]
+
+# the PCA analysis:
+pca_decomposition <- prcomp(data_bin_PCA)
+```
+Calculate a percentage of variance explained by each PCA component.
+```{r PCA_var}
+# calculating a variance of each component
+variance <- pca_decomposition$sdev^2
+variance_perc <- round(variance/sum(variance),4)
+```
+
+```{r pca_plot, fig.cap="\\label{Fig:pca_plot}Variance for each PCs"}
+ggplot(data = as.data.frame(variance_perc), 
+       aes(x = paste0('PC', 1:7), y = variance_perc)) +
+  geom_col() +
+  xlab("") + 
+  labs(title= 'Variance', subtitle='for each PCs',x='', y='') +
+  my_style
+```
+
+As we can see first three components account the most of the variance of the data, but the third component could be also valuable for a model.
+
+```{r data_PCA}
+data_train_pca <- cbind(data_train$is_fraud, as.data.table(pca_decomposition$x)) %>%
+  setNames(c("is_fraud", paste0("PC", 1:7)))
+```
+
+```{r cross_validation_PCA}
+train_bin_cv_pca <- data_train_pca[data_train_bin_cv$train$idx,]
+valid_bin_cv_pca <- data_train_pca[data_train_bin_cv$valid$idx,]
+```
+
+```{r logreg_PCA}
+logreg_PCA <- glm(is_fraud ~ 
+                    PC1 + PC2 + PC3 + PC4 + PC2*PC3 + PC1*PC4,
+                  data = train_bin_cv_pca, family = binomial)
+summary(logreg_PCA)
+
+find_cutoff(logreg_PCA, train_bin_cv_pca, 'is_fraud', 0.001, 0.05, 0.001)
+```
+
+```{r confusion_matrix_logreg_PCA}
+conf_mat_logreg_PCA_train <- 
+  confusion_matrix(logreg_PCA, train_bin_cv_pca, col = "is_fraud", cutoff = 0.0025)
+conf_mat_logreg_PCA_valid <- 
+  confusion_matrix(logreg_PCA, valid_bin_cv_pca, col = "is_fraud", cutoff = 0.0025)
+conf_mat_logreg_PCA_train
+conf_mat_logreg_PCA_valid
+```
+As a result we get on training dataset precision = `r round(conf_mat_logreg_PCA_train[1],3)`, recall = `r round(conf_mat_logreg_PCA_train[2],3)` and on testing dataset precision = `r round(conf_mat_logreg_PCA_valid[1],3)`, recall = `r round(conf_mat_logreg_PCA_valid[2],3)`.
+
+For that model we have similar results as for the previous logistic model. Moreover, we lose interpretation for numerical variables.
+
+### Random Forest
+
+First, we need to create a train-test split on unnormalized data. As it was before, we use 80% of our data as a training set and 20% as a testing set. 
+
+```{r train_test_rf}
+train_cv <- data_train[data_train_bin_cv$train$idx,]
+valid_cv <- data_train[data_train_bin_cv$valid$idx,]
+```
+
+As our data is highly imbalanced, we need to find optimal parameters for a random forest in order to fit the model that performs well. To find this parameter we will use a function called `find_classwt`:
+
+```{r find_classwt}
+find_classwt <- function(data) {
+  
+  recalls <- numeric(0)
+  precisions <- numeric(0)
+  
+  for(t in seq(0.05, 0.95, by=0.05)){
+    gc() # freeing unused memory
+    # fitting random forest with parameter classwt = t for class '0' and = 1-t for '1'
+    forest <- randomForest(as_factor(is_fraud) ~ amt + age + category_fraud + hour_fraud,
+                           data=data, ntree=100, classwt = c('0' = t, '1' = 1-t))
+    # confusion matrix for the model
+    conf_mat <- confusion_matrix(forest, data, 'is_fraud', model_type = "forest")
+    recalls <- c(recalls, conf_mat[2])
+    precisions <- c(precisions, conf_mat[1])
+  }
+  # preparation for plotting
+  metrics <- tibble(
+    weights = seq(0.05, 0.95, by=0.05),
+    precisions = precisions,
+    recalls = recalls
+  )
+  metrics_long <- melt(metrics, id='weights')
+  pl <- ggplot(data=metrics_long, aes(x=weights, y=value, colour=variable)) +
+    geom_line(size=1) +
+    scale_colour_discrete(name ="Metric",
+                          breaks=c("precisions", "recalls"),
+                          labels=c("Precision", "Recall")) +
+    labs(title='Precision & recall rates',
+         subtitle='as functions of the class weight (weight of the "0" class)',
+         x='weight', y='') +
+     theme_light() +
+      theme(
+        plot.subtitle = element_text(size = text_size - 4, colour='black'),
+        plot.title = element_text(size = text_size, face = 'bold'),
+        axis.text=element_text(size=text_size - 4), 
+        axis.title.y = element_text(size = text_size - 4), 
+        axis.title.x = element_text(size = text_size - 4),
+        legend.position = c(0.9,0.9)
+      )
+    
+  return(pl)
+}
+```
+
+The function produces a plot, where we can find a parameter optimal for us.
+
+
+```{r finding_classwt1}
+set.seed(125)
+subset_tr <- sample_n(train_cv, 10^5)
+find_classwt(subset_tr)
+```
+```{r, include=FALSE}
+rm(subset_tr)
+```
+
+Our goal is to maximize recall, so after the analysis we decided to use $0.25$ for "0" class and $0.75$ for "1" class, to balance our data.
+
+Now, we will fit a model with these parameters. We will use $100$ trees, because this setup gives us stable results.
+
+```{r random_forest}
+forest <- randomForest(as_factor(is_fraud) ~ amt + age + category_fraud + hour_fraud,
+                       data=train_cv, 
+                       ntree=100, 
+                       classwt = c('0' = 0.25, '1' = 0.75))
+```
+
+We will take a look at the confusion matrix:
+
+```{r rf_conf_mat}
+conf_mat_forest_train <- confusion_matrix(forest, train_cv, 'is_fraud', model_type = "forest")
+conf_mat_forest_valid <- confusion_matrix(forest, valid_cv, 'is_fraud', model_type = "forest")
+conf_mat_forest_train
+conf_mat_forest_valid
+```
+
+The model gives us very promising outcomes: on the training set recall equals `r round(conf_mat_forest_train[2],3)` and precision is `r round(conf_mat_forest_train[1],3)`, while on the testing set it is `r round(conf_mat_forest_valid[2],3)` and `r round(conf_mat_forest_valid[1],3)`, accordingly.
+
+# Cross validation
+
+For the cross validation we will use a function `crossv_mc`, which conducts Monte Carlo Cross Validation. Also, we will not analyse logistic regression with PCA, as this model gives not better results than the basic logistic regression and lacks the possibility of interpretation.
+
+## Logistic regression
+
+First, we will take a look at the logistic regression. To do that, we will sample a subset of our data, containing $100000$ observations.
+
+```{r cv_logreg}
+set.seed(125)
+n_obs <- 1e5
+subset <- sample_n(
+  data_train_bin[,c("is_fraud", "amt", "age", "category_fraud", "hour_fraud")], 
+  n_obs) 
+test_ratio <- 0.2
+N <- 200
+
+# Creating train/test sets
+cv_mc <- crossv_mc(subset, N, test=test_ratio)
+
+# fitting models on the training sets
+models <- map(cv_mc$train, ~ glm(is_fraud ~ category_fraud + amt + hour_fraud + age:hour_fraud + 
+                                   amt:hour_fraud + amt:category_fraud + age:category_fraud,
+                                 data=., family=binomial))
+
+recalls_train <- map2_dbl(models, cv_mc$train,
+                          ~confusion_matrix(model=.x, data=as_tibble(.y), col='is_fraud',
+                                            cutoff=0.003)[2])
+
+precisions_train <- map2_dbl(models, cv_mc$train,
+                             ~confusion_matrix(model=.x, data=as_tibble(.y), col='is_fraud',
+                                               cutoff=0.003)[1])
+
+recalls_test <- map2_dbl(models, cv_mc$test,
+                         ~confusion_matrix(model=.x, data=as_tibble(.y), col='is_fraud',
+                                           cutoff=0.003)[2])
+
+precisions_test <- map2_dbl(models, cv_mc$test,
+                            ~confusion_matrix(model=.x, data=as_tibble(.y), col='is_fraud',
+                                              cutoff=0.003)[1])
+
+recalls_all <- rbind(data.table(model = 'train_data', 
+                                recalls = recalls_train),
+                     data.table(model = 'test_data', 
+                                recalls = recalls_test))
+
+precisions_all <- rbind(data.table(model = 'train_data', 
+                                   precisions = precisions_train),
+                        data.table(model = 'test_data', 
+                                   precisions = precisions_test))
+
+cv_metrics_plt(recalls_all, "logistic regression")
+cv_metrics_plt(precisions_all, "logistics regression")
+
+```
+
+We can see on the density plots, that recall is high, the density for the testing set is wider, but no serious overfitting can be seen. The precision is very low, but also the densities for the training and the testing sets look similar.
+
+## Random forest
+
+Now, we will do the same for the random forest.
+
+```{r cv_rf}
+set.seed(125)
+n_obs <- 1e5
+subset <- sample_n(
+  data_train[,c("is_fraud", "amt", "age", "category_fraud", "hour_fraud")], 
+  n_obs) 
+test_ratio <- 0.2
+N <- 200
+
+# Creating train/test sets
+cv_mc <- crossv_mc(subset, N, test=test_ratio)
+
+# fitting models on the training sets
+models <- map(cv_mc$train, ~ randomForest(as_factor(is_fraud) ~ amt + age + category_fraud + hour_fraud,
+                                          data=., ntree=100, classwt = c('0' = 0.25, '1' = 0.75)))
+
+recalls_train <- map2_dbl(models, cv_mc$train,
+                          ~confusion_matrix(model=.x, data=as_tibble(.y), 
+                                            col='is_fraud', model_type = "forest")[2])
+
+precisions_train <- map2_dbl(models, cv_mc$train,
+                             ~confusion_matrix(model=.x, data=as_tibble(.y), 
+                                               col='is_fraud', model_type = "forest")[1])
+
+recalls_test <- map2_dbl(models, cv_mc$test,
+                         ~confusion_matrix(model=.x, data=as_tibble(.y), 
+                                           col='is_fraud', model_type = "forest")[2])
+
+precisions_test <- map2_dbl(models, cv_mc$test,
+                            ~confusion_matrix(model=.x, data=as_tibble(.y), 
+                                              col='is_fraud', model_type = "forest")[1])
+
+recalls_all <- rbind(tibble(model = 'train_data', recalls = recalls_train),
+                     tibble(model = 'test_data', recalls = recalls_test))
+
+precisions_all <- rbind(tibble(model = 'train_data', precisions = precisions_train),
+                        tibble(model = 'test_data', precisions = precisions_test))
+
+# Density plot of metrics
+cv_metrics_plt(recalls_all, "random forest")
+cv_metrics_plt(precisions_all, "random forest")
+```
+
+Here, we can see that the model overfits quite seriously, although the metrics for the testing set are still relatively high. The overfit can be seen on the recall, which is not surprising, because we were focusing on finding the parameters that maximize this metric, so the model is not as robust as it should be.
+
+# Conclusion
+
+Comparing the three models, the logistic regression gives the best recall and also do not overfit much. On the other hand, even though the random forest overfits our data heavily, it gives not much lower recall on the testing set and also much higher precision. 
+The PCA for the logistic regression model gives similar results as the basic logistic regression, while it does not provide possibility to interpret the model. For that reasons, we reject this model for our problem.
+
+```{r, test_dataset, include = FALSE}
+#### Performance check on testing dataset --------------------------------------
+# Logistic regression
+data_test <- data_preprocess_logreg(data_test)
+logreg <- glm(is_fraud ~ 
+                category_fraud + amt + hour_fraud + age:hour_fraud + amt:hour_fraud + amt:category_fraud + age:category_fraud,
+              data = data_test, family = binomial)
+summary(logreg)
+
+conf_mat_logreg_test <- confusion_matrix(logreg, data_test, col = "is_fraud", cutoff = 0.003)
+
+# Random forest
+data_test <- data_preprocess_forest(data_test)
+forest <- glm(as_factor(is_fraud) ~ amt + age + category_fraud + hour_fraud,
+              data = data_test, family = binomial)
+summary(forest)
+
+conf_mat_forest_test <- confusion_matrix(forest, data_test, col = "is_fraud", cutoff = 0.0025)
+```
+
+```{r, include=FALSE}
+model <- c('logistic regression', 'random forest')
+quality <- c('not overfited', 'significantly overfited')
+recall_train <- c(round(conf_mat_logreg_train[2], 3),round(conf_mat_forest_train[2],3))
+precision_train <- c(round(conf_mat_logreg_train[1], 3),round(conf_mat_forest_train[1],3))
+recall_test <- c(round(conf_mat_logreg_test[2], 3),round( conf_mat_forest_test[2],3))
+precision_test <- c(round(conf_mat_logreg_test[1], 3),round( conf_mat_forest_test[1],3))
+tbl <- tibble(Model = model,
+              Quality = quality,
+              Recall_train = recall_train,
+              Precision_train = precision_train,
+              Recall_test = recall_test,
+              Precision_test = precision_test)
+```
+```{r table_conclusion, echo=FALSE, include=TRUE}
+knitr::kable(tbl, caption = "Table with results for the logistic regression and the random forest.")
+
+```
+
+We think that the logistic regression is more transparent and in this case also more robust, while the random forest is better in terms of not giving too many false alarms. We would recommend implementing the model `logreg` for now. On the other hand, we believe, that random forest could give better results in the long run, if implemented with additional variables like "time from the last transaction" or "number of transactions made on the same day".
+
+Overall, for now we recommend the model `logreg` as the best of the models presented in this paper.
