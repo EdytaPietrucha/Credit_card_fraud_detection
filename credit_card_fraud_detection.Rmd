@@ -160,18 +160,38 @@ And the types are correct now.
 
 ## Explanatory Data Analysis
 
-All functions used in project can be found in the Appendix.
-
 ### Age
 
-We created a new variable which counts age of each Customer in a day of a transaction. We assume that age of a Holder can have an impact on detecting fraudulent transactions, especially combined with variables such as amount of money spent on a transaction or transacion time.
+We created a new variable which counts age of each Customer in a day of a transaction. We assume that age of a Holder can have an impact on detecting fraudulent transactions, especially combined with variables such as amount of money spent on a transaction or transaction time.
 
 ```{r age}
 data_train[, age := round(as.numeric(difftime(trans_date_trans_time, dob, units = "days")/365), 0)]
 
 ```
 
-Data visualization:
+To visualize the data we define one figures style:
+
+```{r my_style, include=TRUE}
+# Custom figures style 
+text_size <- 12
+# customize my_style settings
+my_style <-  theme_light() + 
+  theme(
+    legend.position = 'none',
+    plot.subtitle = element_text(size = text_size - 4, colour='black'),
+    plot.title = element_text(size = text_size, face = 'bold'),
+    axis.text=element_text(size=text_size - 4), 
+    axis.title.y = element_text(size = text_size - 4), 
+    axis.title.x = element_text(size = text_size - 4),
+    legend.background = element_rect(fill = "white")
+  ) 
+# define my palette colors
+my_palette <- c("#D73027", "#FDAE61", "#FFFFBF", 
+                         "#A50026", '#ABD9E9', '#4575B4', 
+                         '#313695', 'black', "lawngreen")
+```
+
+
 ```{r age_plot, fig.cap="\\label{Fig:age_plot}Boxplot for variable age group by not-fraudulent transactions and fraudulent transactions."}
 ggplot(data_train, aes(x = is_fraud, y = age)) +
   geom_boxplot() +
@@ -179,14 +199,14 @@ ggplot(data_train, aes(x = is_fraud, y = age)) +
   labs(title = "Boxplot for age of Customer",
        subtitle="group by not-fraudulent transactions and fraudulent transactions")
 ```
-Mean for fraudulent transactions is a little bit higher than for not-fraudulent transactions.
+Figure \ref{Fig:age_plot} shows that mean for fraudulent transactions is a little bit higher than for not-fraudulent transactions.
 
 ### Gender
 
 Further analysis has led us to this conclusion that even though there are less men than women in our data, the number of frauds for men is slightly higher than for women.
 
 ```{r gender}
-# checking a percentage of fraud transaction of each gender
+# checking a percentage of fraud transaction group by gender
 gender_fraud <- data_train %>% 
   .[, .(count = .N), by = c("gender", "is_fraud")] %>%
   .[, .(is_fraud, freq = count/sum(count)), by = gender] %>%
@@ -224,7 +244,8 @@ We would like to create a boxplot to visualize datapoints, but we detected to mu
 ```{r remove_outliers}
 remove_outlier <- function(data, column) {
   
-  IQR <- quantile(data[, get(column)], 0.75) - quantile(data[, get(column)], 0.25) # IQR= Q3 (75% quantile) – Q1 (25% quantile)
+  # IQR= Q3 (75% quantile) – Q1 (25% quantile)
+  IQR <- quantile(data[, get(column)], 0.75) - quantile(data[, get(column)], 0.25) 
   # Outlier would be a point below [Q1- (1.5)IQR] or above [Q3+(1.5)IQR]
   l <- quantile(data[, get(column)], 0.25) - 1.5*IQR
   r <- quantile(data[, get(column)], 0.75) + 1.5*IQR
@@ -265,7 +286,6 @@ week_day_fraud <- data_train %>%
 ```
 
 Once we have created the variable, we can look at the frequency of frauds on each day.
-On Mondays and Tuesdays the odds of a fraudulent transactions are slightly lower than on the other days.
 
 ```{r weekday_plot, fig.cap="\\label{Fig:weekday_plot}Frequancy of fraudulent transactions grouped by the weekday."}
 ggplot(week_day_fraud, aes(x = week_day_of_trans, y = freq, fill = week_day_of_trans)) +
@@ -281,6 +301,8 @@ ggplot(week_day_fraud, aes(x = week_day_of_trans, y = freq, fill = week_day_of_t
 ```{r, include=FALSE}
 rm(week_day_fraud)
 ```
+Based on Figure \ref{Fig:weekday_plot} on Mondays and Tuesdays the odds of a fraudulent transactions are slightly lower than on the other days.
+
 ### Category of Purchase
 
 Investigating the data, we see that some categories, that is: *grocery_pos*, *misc_net*, *shopping_net* and *shopping_pos*, seem to be more vulnerable to fraudulent transactions than others.
@@ -353,12 +375,13 @@ data_train[, dist := sqrt((long-merch_long)^2 + (lat-merch_lat)^2)]
 ggplot(data_train, aes(x = is_fraud, y = dist)) +
   geom_boxplot() +
   my_style +
+  theme(plot.title = element_text(size = text_size - 1, face = 'bold')) +
   labs(title = "Boxplot for distance between the home of a Holder and the place of a Merchant",
        subtitle = "group by not-fraudulent transactions and fraudulent transactions")
 
 ```
 
-The boxplot shows no significant difference in distance for fraudulent and non-fraudulent transactions.
+The boxplot on Figure \ref{Fig:dist_plot} shows no significant difference in distance for fraudulent and non-fraudulent transactions.
 
 ## Data binning
 
@@ -394,7 +417,7 @@ Now, we will apply the results combined with analysis of the plots shown earlier
 ```{r bins}
 data_train[, weekday_fraud := if_else(week_day_of_trans %in% 4:7, 1, 0)]
 data_train[, category_fraud := 
-             if_else(category %in% c('grocery_pos', 'misc_net', 'shopping_net', 'shopping_pos'), 1, 0)]
+             if_else(category %in% c('grocery_pos','misc_net','shopping_net','shopping_pos'),1,0)]
 data_train[, hour_fraud := 
              if_else(trans_hour %in% c('00', '01', '02', '03', '22', '23'), 1, 0)]
 data_train[,c("weekday_fraud", "category_fraud", "hour_fraud"):= 
@@ -411,7 +434,7 @@ We can also drop more variables (for binned and unbinned data):
 
 Also, we will add binned variables to `data`, because we will perform normalization and our data is too big to keep all three datasets with original, binned and normalized data.
 
-```{r drop, include=FALSE}
+```{r drop, include=TRUE}
 data_train <- data_train %>% 
   .[,-c('lat','long','merch_lat','merch_long','cc_num','merchant', 'dob', 'trans_date_trans_time')]
 ```
@@ -434,11 +457,11 @@ data_train_bin[, (temp) := lapply(.SD, min_max_norm), .SDcols = temp] # referenc
 
 ## Correlation
 
-```{r correlation, fig.cap="The correlation structure of the data."}
+```{r correlation, fig.cap="\\label{Fig:correlation}The correlation structure of the data."}
 ggcorr(data_train[, ..temp], label = T)
 ```
 
-Correlation is very low for all numerical variables.
+Figure \ref{Fig:correlation} shows that correlation is very low for all numerical variables.
 
 # Models
 
@@ -473,7 +496,8 @@ We would like to point out that we are focusing on maximizing recall, but also t
 ```{r confusion_matrix}
 confusion_matrix <- function(model, data, col, cutoff=0.5, model_type = "logistic") {
   
-  predictScore <- as.numeric(predict(object=model, type='response',newdat=data)) # calculating prediction scores
+  # calculating prediction scores
+  predictScore <- as.numeric(predict(object=model, type='response',newdat=data)) 
   
   if (model_type == "forest") predictScore = predictScore -1
   
@@ -512,9 +536,10 @@ find_cutoff <- function(model, data, target_variable, min_cutoff=0.1, max_cutoff
   metrics_long <- melt(metrics, id='cutoffs')
   pl <- ggplot(data=metrics_long, aes(x=cutoffs, y=value, colour=variable)) + 
     geom_line(size=1) +
-    scale_colour_discrete(name  ="Metric",
-                          breaks=c("precisions", "recalls"),
-                          labels=c("Precision", "Recall")) +
+    scale_colour_manual("Metric", 
+                        breaks=c("precisions", "recalls"),
+                        labels=c("Precision", "Recall"),
+                        values = c(my_palette[c(4,7)]))  +
     labs(title='Precision & recall rates',
          subtitle='as functions of the cutoff',
          x='Cutoff', y='') +
@@ -542,9 +567,9 @@ Let us look at the confusion matrix:
 ```{r confusion_matrix_logreg}
 conf_mat_logreg_train <- 
   confusion_matrix(logreg, train_bin_cv, col = "is_fraud", cutoff = 0.003)
+conf_mat_logreg_train
 conf_mat_logreg_valid <- 
   confusion_matrix(logreg, valid_bin_cv, col = "is_fraud", cutoff = 0.003)
-conf_mat_logreg_train
 conf_mat_logreg_valid
 ```
 As a result we get on training dataset precision equals `r round(conf_mat_logreg_train[1],3)`, recall equals `r round(conf_mat_logreg_train[2],3)` and on testing dataset precision equals `r round(conf_mat_logreg_valid[1],3)`, recall equals `r round(conf_mat_logreg_valid[2],3)`. This model is a good contender, but in next consideration we will focus on getting higher precision with assuming high recall.
@@ -581,7 +606,7 @@ ggplot(data = as.data.frame(variance_perc),
   my_style
 ```
 
-As we can see first three components account the most of the variance of the data, but the third component could be also valuable for a model.
+As we can see from the Figure \ref{Fig:pca_plot} first three components account the most of the variance of the data, but the third component could be also valuable for a model.
 
 ```{r data_PCA}
 data_train_pca <- cbind(data_train$is_fraud, as.data.table(pca_decomposition$x)) %>%
@@ -605,9 +630,9 @@ find_cutoff(logreg_PCA, train_bin_cv_pca, 'is_fraud', 0.001, 0.05, 0.001)
 ```{r confusion_matrix_logreg_PCA}
 conf_mat_logreg_PCA_train <- 
   confusion_matrix(logreg_PCA, train_bin_cv_pca, col = "is_fraud", cutoff = 0.0025)
+conf_mat_logreg_PCA_train
 conf_mat_logreg_PCA_valid <- 
   confusion_matrix(logreg_PCA, valid_bin_cv_pca, col = "is_fraud", cutoff = 0.0025)
-conf_mat_logreg_PCA_train
 conf_mat_logreg_PCA_valid
 ```
 As a result we get on training dataset precision = `r round(conf_mat_logreg_PCA_train[1],3)`, recall = `r round(conf_mat_logreg_PCA_train[2],3)` and on testing dataset precision = `r round(conf_mat_logreg_PCA_valid[1],3)`, recall = `r round(conf_mat_logreg_PCA_valid[2],3)`.
@@ -650,9 +675,10 @@ find_classwt <- function(data) {
   metrics_long <- melt(metrics, id='weights')
   pl <- ggplot(data=metrics_long, aes(x=weights, y=value, colour=variable)) +
     geom_line(size=1) +
-    scale_colour_discrete(name ="Metric",
-                          breaks=c("precisions", "recalls"),
-                          labels=c("Precision", "Recall")) +
+    scale_colour_manual("Metric", 
+                        breaks=c("precisions", "recalls"),
+                        labels=c("Precision", "Recall"),
+                        values = c(my_palette[c(4,7)]))  +
     labs(title='Precision & recall rates',
          subtitle='as functions of the class weight (weight of the "0" class)',
          x='weight', y='') +
@@ -697,8 +723,8 @@ We will take a look at the confusion matrix:
 
 ```{r rf_conf_mat}
 conf_mat_forest_train <- confusion_matrix(forest, train_cv, 'is_fraud', model_type = "forest")
-conf_mat_forest_valid <- confusion_matrix(forest, valid_cv, 'is_fraud', model_type = "forest")
 conf_mat_forest_train
+conf_mat_forest_valid <- confusion_matrix(forest, valid_cv, 'is_fraud', model_type = "forest")
 conf_mat_forest_valid
 ```
 
@@ -710,7 +736,7 @@ For the cross validation we will use a function `crossv_mc`, which conducts Mont
 
 ## Logistic regression
 
-First, we will take a look at the logistic regression. To do that, we will sample a subset of our data, containing $100000$ observations.
+First, we will take a look at the logistic regression. To do that, we will sample a subset of our data, containing $100'000$ observations.
 
 ```{r cv_logreg}
 set.seed(125)
@@ -755,11 +781,39 @@ precisions_all <- rbind(data.table(model = 'train_data',
                         data.table(model = 'test_data', 
                                    precisions = precisions_test))
 
+```
+To visualize the result we prepared a funtion which return a plot of density for metrics precision and recall.
+
+```{r cv_metrics_plt, include=TRUE}
+# Cross-validation density of metrics
+cv_metrics_plt <- function(metrics, model_nm = "logistic regression") {
+  
+  metric_nm <- names(metrics)[2]
+  title_nm <- paste0("Density plot for ", metric_nm)
+  subtitle_nm <- paste0("for ", model_nm)
+  
+  plt <- ggplot(as.data.frame(metrics), aes(get(metric_nm), colour = model, fill = model)) +
+    geom_density(alpha = 0.7) +
+    theme_light() +
+    theme(
+      plot.subtitle = element_text(size = text_size - 4, colour='black'),
+      plot.title = element_text(size = text_size, face = 'bold'),
+      axis.text=element_text(size=text_size - 4), 
+      axis.title.y = element_text(size = text_size - 4), 
+      axis.title.x = element_text(size = text_size - 4)
+    ) +
+    scale_fill_manual(values = c(my_palette[c(4,7)]))  + 
+    labs(title = title_nm,
+         subtitle = subtitle_nm,
+         y = "",
+         x = metric_nm)
+  
+  return(plt)
+}
+
 cv_metrics_plt(recalls_all, "logistic regression")
 cv_metrics_plt(precisions_all, "logistics regression")
-
 ```
-
 We can see on the density plots, that recall is high, the density for the testing set is wider, but no serious overfitting can be seen. The precision is very low, but also the densities for the training and the testing sets look similar.
 
 ## Random forest
@@ -811,30 +865,114 @@ cv_metrics_plt(precisions_all, "random forest")
 
 Here, we can see that the model overfits quite seriously, although the metrics for the testing set are still relatively high. The overfit can be seen on the recall, which is not surprising, because we were focusing on finding the parameters that maximize this metric, so the model is not as robust as it should be.
 
+# Testing dataset
+
+Finally, to provide an unbiased evaluation of a final models fit, we check models performance on independent testing dataset. Similarly, as in previous Section we will not analyse logistic regression with PCA, because of poor output comparing with the basic logistic regression.
+
+We created functions used to data preprocessing, before fit the models.
+
+```{r data_preprocess, include = TRUE}
+# Data preprocessing used for test dataset (random forest) 
+data_preprocess_forest <- function(data) {
+  
+  # Select useful columns
+  data <- data %>%
+    .[,c("is_fraud", "category", "amt", "trans_date_trans_time", "dob")]
+  
+  # Convert into factors
+  dt <- c( "category", "is_fraud")
+  data[,(dt):= lapply(.SD, as.factor), .SDcols = dt]
+  
+  # Convert into data class
+  data[, trans_date_trans_time := strptime(trans_date_trans_time,
+                                           format ="%Y-%m-%d %H:%M:%OS", 
+                                           tz = "EST")]
+  # Compute age of the customer in a day of transaction
+  data[, age := round(as.numeric(difftime(trans_date_trans_time, dob, units = "days")/365), 0)]
+  # Adding a weekday of transaction
+  data[, week_day_of_trans := as.factor(wday(trans_date_trans_time))]
+  # Hour of the transaction
+  data[, trans_hour := as_factor(strftime(trans_date_trans_time, 
+                                          format="%H", 
+                                          tz = "EST"))]
+  # Adding bin variables
+  data[, weekday_fraud := if_else(week_day_of_trans %in% 4:7, 1, 0)]
+  data[, category_fraud := 
+         if_else(category %in% c('grocery_pos','misc_net','shopping_net','shopping_pos'),1,0)]
+  data[, hour_fraud := 
+         if_else(trans_hour %in% c('00', '01', '02', '03', '22', '23'), 1, 0)]
+  data[,c("weekday_fraud", "category_fraud", "hour_fraud"):= 
+         lapply(.SD, as.factor), .SDcols = c("weekday_fraud", "category_fraud", "hour_fraud")]
+  
+  return(data)
+}
+
+# Data preprocessing used for test dataset (logistic regression) 
+data_preprocess_logreg <- function(data) {
+  
+  # Same data manipulation as for random forest
+  data <- data_preprocess_forest(data)
+  # Normalization
+  temp <- c('amt','age')
+  data[, (temp) := lapply(.SD, min_max_norm), .SDcols = temp]
+  
+  return(data)
+}
+
+```
+## Logistic regression
+Performance check on testing dataset for logistic regression.
+```{r, test_dataset_logreg, include = TRUE} 
+# Logistic regression
+data_test_logreg <- data_preprocess_logreg(data_test)
+logreg <- glm(is_fraud ~ 
+                category_fraud + amt + hour_fraud + age:hour_fraud + amt:hour_fraud + amt:category_fraud + age:category_fraud,
+              data = data_test_logreg, 
+              family = binomial)
+```
+
+We will take a look at the confusion matrix:
+
+```{r logreg_conf_mat_test}
+conf_mat_logreg_test <- confusion_matrix(logreg, data_test_logreg, col = "is_fraud", cutoff = 0.003)
+conf_mat_logreg_test
+```
+
+The model gives outcomes on testing data set: recall equals `r round(conf_mat_logreg_test[2],3)` and precision is `r round(conf_mat_logreg_test[1],3)`.
+
+```{r ,,include=FALSE}
+rm(list=c('data_test_logreg'))
+```
+
+## Random forest
+Performance check on testing dataset for random forest.
+```{r, test_dataset_forest, include = TRUE} 
+# Random forest
+data_test_forest <- data_preprocess_forest(data_test)
+forest <- randomForest(as_factor(is_fraud) ~ amt + age + category_fraud + hour_fraud,
+              data = data_test_forest, 
+              ntree=100, 
+              classwt = c('0' = 0.25, '1' = 0.75))
+```
+
+We will take a look at the confusion matrix:
+
+```{r forest_conf_mat_test}
+conf_mat_forest_test <- confusion_matrix(forest, data_test_forest, col = "is_fraud", cutoff = 0.0025, model_type = "forest")
+conf_mat_forest_test
+```
+
+The model gives outcomes on the testing data set: recall equals `r round(conf_mat_forest_test[2],3)` and precision is `r round(conf_mat_forest_test[1],3)`.
+
+```{r ,,include=FALSE}
+rm(list=c('data_test_forest'))
+```
+
 # Conclusion
 
 Comparing the three models, the logistic regression gives the best recall and also do not overfit much. On the other hand, even though the random forest overfits our data heavily, it gives not much lower recall on the testing set and also much higher precision. 
 The PCA for the logistic regression model gives similar results as the basic logistic regression, while it does not provide possibility to interpret the model. For that reasons, we reject this model for our problem.
 
-```{r, test_dataset, include = FALSE}
-#### Performance check on testing dataset --------------------------------------
-# Logistic regression
-data_test <- data_preprocess_logreg(data_test)
-logreg <- glm(is_fraud ~ 
-                category_fraud + amt + hour_fraud + age:hour_fraud + amt:hour_fraud + amt:category_fraud + age:category_fraud,
-              data = data_test, family = binomial)
-summary(logreg)
-
-conf_mat_logreg_test <- confusion_matrix(logreg, data_test, col = "is_fraud", cutoff = 0.003)
-
-# Random forest
-data_test <- data_preprocess_forest(data_test)
-forest <- glm(as_factor(is_fraud) ~ amt + age + category_fraud + hour_fraud,
-              data = data_test, family = binomial)
-summary(forest)
-
-conf_mat_forest_test <- confusion_matrix(forest, data_test, col = "is_fraud", cutoff = 0.0025)
-```
 
 ```{r, include=FALSE}
 model <- c('logistic regression', 'random forest')

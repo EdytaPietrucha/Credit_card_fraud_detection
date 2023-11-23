@@ -368,15 +368,13 @@ And the types are correct now.
 \hypertarget{explanatory-data-analysis}{%
 \section{Explanatory Data Analysis}\label{explanatory-data-analysis}}
 
-All functions used in project can be found in the Appendix.
-
 \hypertarget{age}{%
 \subsection{Age}\label{age}}
 
 We created a new variable which counts age of each Customer in a day of
 a transaction. We assume that age of a Holder can have an impact on
 detecting fraudulent transactions, especially combined with variables
-such as amount of money spent on a transaction or transacion time.
+such as amount of money spent on a transaction or transaction time.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -384,7 +382,29 @@ such as amount of money spent on a transaction or transacion time.
 \end{Highlighting}
 \end{Shaded}
 
-Data visualization:
+To visualize the data we define one figures style:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Custom figures style }
+\NormalTok{text\_size }\OtherTok{\textless{}{-}} \DecValTok{12}
+\CommentTok{\# customize my\_style settings}
+\NormalTok{my\_style }\OtherTok{\textless{}{-}}  \FunctionTok{theme\_light}\NormalTok{() }\SpecialCharTok{+} 
+  \FunctionTok{theme}\NormalTok{(}
+    \AttributeTok{legend.position =} \StringTok{\textquotesingle{}none\textquotesingle{}}\NormalTok{,}
+    \AttributeTok{plot.subtitle =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size =}\NormalTok{ text\_size }\SpecialCharTok{{-}} \DecValTok{4}\NormalTok{, }\AttributeTok{colour=}\StringTok{\textquotesingle{}black\textquotesingle{}}\NormalTok{),}
+    \AttributeTok{plot.title =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size =}\NormalTok{ text\_size, }\AttributeTok{face =} \StringTok{\textquotesingle{}bold\textquotesingle{}}\NormalTok{),}
+    \AttributeTok{axis.text=}\FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size=}\NormalTok{text\_size }\SpecialCharTok{{-}} \DecValTok{4}\NormalTok{), }
+    \AttributeTok{axis.title.y =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size =}\NormalTok{ text\_size }\SpecialCharTok{{-}} \DecValTok{4}\NormalTok{), }
+    \AttributeTok{axis.title.x =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size =}\NormalTok{ text\_size }\SpecialCharTok{{-}} \DecValTok{4}\NormalTok{),}
+    \AttributeTok{legend.background =} \FunctionTok{element\_rect}\NormalTok{(}\AttributeTok{fill =} \StringTok{"white"}\NormalTok{)}
+\NormalTok{  ) }
+\CommentTok{\# define my palette colors}
+\NormalTok{my\_palette }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\StringTok{"\#D73027"}\NormalTok{, }\StringTok{"\#FDAE61"}\NormalTok{, }\StringTok{"\#FFFFBF"}\NormalTok{, }
+                         \StringTok{"\#A50026"}\NormalTok{, }\StringTok{\textquotesingle{}\#ABD9E9\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}\#4575B4\textquotesingle{}}\NormalTok{, }
+                         \StringTok{\textquotesingle{}\#313695\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}black\textquotesingle{}}\NormalTok{, }\StringTok{"lawngreen"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -397,8 +417,8 @@ Data visualization:
 \end{Shaded}
 
 \includegraphics{credit_card_fraud_detection_files/figure-latex/age_plot-1.pdf}
-Mean for fraudulent transactions is a little bit higher than for
-not-fraudulent transactions.
+Figure \ref{Fig:age_plot} shows that mean for fraudulent transactions is
+a little bit higher than for not-fraudulent transactions.
 
 \hypertarget{gender}{%
 \subsection{Gender}\label{gender}}
@@ -409,7 +429,7 @@ slightly higher than for women.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\CommentTok{\# checking a percentage of fraud transaction of each gender}
+\CommentTok{\# checking a percentage of fraud transaction group by gender}
 \NormalTok{gender\_fraud }\OtherTok{\textless{}{-}}\NormalTok{ data\_train }\SpecialCharTok{\%\textgreater{}\%} 
 \NormalTok{  .[, .(}\AttributeTok{count =}\NormalTok{ .N), by }\OtherTok{=} \FunctionTok{c}\NormalTok{(}\StringTok{"gender"}\NormalTok{, }\StringTok{"is\_fraud"}\NormalTok{)] }\SpecialCharTok{\%\textgreater{}\%}
 \NormalTok{  .[, .(is\_fraud, }\AttributeTok{freq =}\NormalTok{ count}\SpecialCharTok{/}\FunctionTok{sum}\NormalTok{(count)), by }\OtherTok{=}\NormalTok{ gender] }\SpecialCharTok{\%\textgreater{}\%}
@@ -465,7 +485,8 @@ which removes outliers from a dataset.
 \begin{Highlighting}[]
 \NormalTok{remove\_outlier }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(data, column) \{}
   
-\NormalTok{  IQR }\OtherTok{\textless{}{-}} \FunctionTok{quantile}\NormalTok{(data[, }\FunctionTok{get}\NormalTok{(column)], }\FloatTok{0.75}\NormalTok{) }\SpecialCharTok{{-}} \FunctionTok{quantile}\NormalTok{(data[, }\FunctionTok{get}\NormalTok{(column)], }\FloatTok{0.25}\NormalTok{) }\CommentTok{\# IQR= Q3 (75\% quantile) – Q1 (25\% quantile)}
+  \CommentTok{\# IQR= Q3 (75\% quantile) – Q1 (25\% quantile)}
+\NormalTok{  IQR }\OtherTok{\textless{}{-}} \FunctionTok{quantile}\NormalTok{(data[, }\FunctionTok{get}\NormalTok{(column)], }\FloatTok{0.75}\NormalTok{) }\SpecialCharTok{{-}} \FunctionTok{quantile}\NormalTok{(data[, }\FunctionTok{get}\NormalTok{(column)], }\FloatTok{0.25}\NormalTok{) }
   \CommentTok{\# Outlier would be a point below [Q1{-} (1.5)IQR] or above [Q3+(1.5)IQR]}
 \NormalTok{  l }\OtherTok{\textless{}{-}} \FunctionTok{quantile}\NormalTok{(data[, }\FunctionTok{get}\NormalTok{(column)], }\FloatTok{0.25}\NormalTok{) }\SpecialCharTok{{-}} \FloatTok{1.5}\SpecialCharTok{*}\NormalTok{IQR}
 \NormalTok{  r }\OtherTok{\textless{}{-}} \FunctionTok{quantile}\NormalTok{(data[, }\FunctionTok{get}\NormalTok{(column)], }\FloatTok{0.75}\NormalTok{) }\SpecialCharTok{+} \FloatTok{1.5}\SpecialCharTok{*}\NormalTok{IQR}
@@ -525,8 +546,7 @@ transaction hour. So we decided to create a variable
 \end{Shaded}
 
 Once we have created the variable, we can look at the frequency of
-frauds on each day. On Mondays and Tuesdays the odds of a fraudulent
-transactions are slightly lower than on the other days.
+frauds on each day.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -548,6 +568,9 @@ transactions are slightly lower than on the other days.
 \caption{\label{Fig:weekday_plot}Frequancy of fraudulent transactions
 grouped by the weekday.}
 \end{figure}
+
+Based on Figure \ref{Fig:weekday_plot} on Mondays and Tuesdays the odds
+of a fraudulent transactions are slightly lower than on the other days.
 
 \hypertarget{category-of-purchase}{%
 \subsection{Category of Purchase}\label{category-of-purchase}}
@@ -660,6 +683,7 @@ places, using the formula:
 \FunctionTok{ggplot}\NormalTok{(data\_train, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ is\_fraud, }\AttributeTok{y =}\NormalTok{ dist)) }\SpecialCharTok{+}
   \FunctionTok{geom\_boxplot}\NormalTok{() }\SpecialCharTok{+}
 \NormalTok{  my\_style }\SpecialCharTok{+}
+  \FunctionTok{theme}\NormalTok{(}\AttributeTok{plot.title =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size =}\NormalTok{ text\_size }\SpecialCharTok{{-}} \DecValTok{1}\NormalTok{, }\AttributeTok{face =} \StringTok{\textquotesingle{}bold\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
   \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =} \StringTok{"Boxplot for distance between the home of a Holder and the place of a Merchant"}\NormalTok{,}
        \AttributeTok{subtitle =} \StringTok{"group by not{-}fraudulent transactions and fraudulent transactions"}\NormalTok{)}
 \end{Highlighting}
@@ -672,8 +696,8 @@ places, using the formula:
 Holder and the place of a Merchant, grouped by is\_fraud.}
 \end{figure}
 
-The boxplot shows no significant difference in distance for fraudulent
-and non-fraudulent transactions.
+The boxplot on Figure \ref{Fig:dist_plot} shows no significant
+difference in distance for fraudulent and non-fraudulent transactions.
 
 \hypertarget{data-binning}{%
 \section{Data binning}\label{data-binning}}
@@ -754,7 +778,7 @@ earlier and bin some variables.
 \begin{Highlighting}[]
 \NormalTok{data\_train[, weekday\_fraud }\SpecialCharTok{:}\ErrorTok{=} \FunctionTok{if\_else}\NormalTok{(week\_day\_of\_trans }\SpecialCharTok{\%in\%} \DecValTok{4}\SpecialCharTok{:}\DecValTok{7}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{)]}
 \NormalTok{data\_train[, category\_fraud }\SpecialCharTok{:}\ErrorTok{=} 
-             \FunctionTok{if\_else}\NormalTok{(category }\SpecialCharTok{\%in\%} \FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}grocery\_pos\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}misc\_net\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}shopping\_net\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}shopping\_pos\textquotesingle{}}\NormalTok{), }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{)]}
+             \FunctionTok{if\_else}\NormalTok{(category }\SpecialCharTok{\%in\%} \FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}grocery\_pos\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}misc\_net\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}shopping\_net\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}shopping\_pos\textquotesingle{}}\NormalTok{),}\DecValTok{1}\NormalTok{,}\DecValTok{0}\NormalTok{)]}
 \NormalTok{data\_train[, hour\_fraud }\SpecialCharTok{:}\ErrorTok{=} 
              \FunctionTok{if\_else}\NormalTok{(trans\_hour }\SpecialCharTok{\%in\%} \FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}00\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}01\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}02\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}03\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}22\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}23\textquotesingle{}}\NormalTok{), }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{)]}
 \NormalTok{data\_train[,}\FunctionTok{c}\NormalTok{(}\StringTok{"weekday\_fraud"}\NormalTok{, }\StringTok{"category\_fraud"}\NormalTok{, }\StringTok{"hour\_fraud"}\NormalTok{)}\SpecialCharTok{:}\ErrorTok{=} 
@@ -784,6 +808,13 @@ We can also drop more variables (for binned and unbinned data):
 Also, we will add binned variables to \texttt{data}, because we will
 perform normalization and our data is too big to keep all three datasets
 with original, binned and normalized data.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{data\_train }\OtherTok{\textless{}{-}}\NormalTok{ data\_train }\SpecialCharTok{\%\textgreater{}\%} 
+\NormalTok{  .[,}\SpecialCharTok{{-}}\FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}lat\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}long\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}merch\_lat\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}merch\_long\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}cc\_num\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}merchant\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}dob\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}trans\_date\_trans\_time\textquotesingle{}}\NormalTok{)]}
+\end{Highlighting}
+\end{Shaded}
 
 \hypertarget{normalization}{%
 \section{Normalization}\label{normalization}}
@@ -820,10 +851,11 @@ from lecture materials.
 \begin{figure}
 \centering
 \includegraphics{credit_card_fraud_detection_files/figure-latex/correlation-1.pdf}
-\caption{The correlation structure of the data.}
+\caption{\label{Fig:correlation}The correlation structure of the data.}
 \end{figure}
 
-Correlation is very low for all numerical variables.
+Figure \ref{Fig:correlation} shows that correlation is very low for all
+numerical variables.
 
 \hypertarget{models}{%
 \chapter{Models}\label{models}}
@@ -906,7 +938,8 @@ us values for recall and precision.
 \begin{Highlighting}[]
 \NormalTok{confusion\_matrix }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(model, data, col, }\AttributeTok{cutoff=}\FloatTok{0.5}\NormalTok{, }\AttributeTok{model\_type =} \StringTok{"logistic"}\NormalTok{) \{}
   
-\NormalTok{  predictScore }\OtherTok{\textless{}{-}} \FunctionTok{as.numeric}\NormalTok{(}\FunctionTok{predict}\NormalTok{(}\AttributeTok{object=}\NormalTok{model, }\AttributeTok{type=}\StringTok{\textquotesingle{}response\textquotesingle{}}\NormalTok{,}\AttributeTok{newdat=}\NormalTok{data)) }\CommentTok{\# calculating prediction scores}
+  \CommentTok{\# calculating prediction scores}
+\NormalTok{  predictScore }\OtherTok{\textless{}{-}} \FunctionTok{as.numeric}\NormalTok{(}\FunctionTok{predict}\NormalTok{(}\AttributeTok{object=}\NormalTok{model, }\AttributeTok{type=}\StringTok{\textquotesingle{}response\textquotesingle{}}\NormalTok{,}\AttributeTok{newdat=}\NormalTok{data)) }
   
   \ControlFlowTok{if}\NormalTok{ (model\_type }\SpecialCharTok{==} \StringTok{"forest"}\NormalTok{) predictScore }\OtherTok{=}\NormalTok{ predictScore }\SpecialCharTok{{-}}\DecValTok{1}
   
@@ -950,9 +983,10 @@ precision and recall for each model by changing the value of parameter
 \NormalTok{  metrics\_long }\OtherTok{\textless{}{-}} \FunctionTok{melt}\NormalTok{(metrics, }\AttributeTok{id=}\StringTok{\textquotesingle{}cutoffs\textquotesingle{}}\NormalTok{)}
 \NormalTok{  pl }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(}\AttributeTok{data=}\NormalTok{metrics\_long, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{cutoffs, }\AttributeTok{y=}\NormalTok{value, }\AttributeTok{colour=}\NormalTok{variable)) }\SpecialCharTok{+} 
     \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{size=}\DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
-    \FunctionTok{scale\_colour\_discrete}\NormalTok{(}\AttributeTok{name  =}\StringTok{"Metric"}\NormalTok{,}
-                          \AttributeTok{breaks=}\FunctionTok{c}\NormalTok{(}\StringTok{"precisions"}\NormalTok{, }\StringTok{"recalls"}\NormalTok{),}
-                          \AttributeTok{labels=}\FunctionTok{c}\NormalTok{(}\StringTok{"Precision"}\NormalTok{, }\StringTok{"Recall"}\NormalTok{)) }\SpecialCharTok{+}
+    \FunctionTok{scale\_colour\_manual}\NormalTok{(}\StringTok{"Metric"}\NormalTok{, }
+                        \AttributeTok{breaks=}\FunctionTok{c}\NormalTok{(}\StringTok{"precisions"}\NormalTok{, }\StringTok{"recalls"}\NormalTok{),}
+                        \AttributeTok{labels=}\FunctionTok{c}\NormalTok{(}\StringTok{"Precision"}\NormalTok{, }\StringTok{"Recall"}\NormalTok{),}
+                        \AttributeTok{values =} \FunctionTok{c}\NormalTok{(my\_palette[}\FunctionTok{c}\NormalTok{(}\DecValTok{4}\NormalTok{,}\DecValTok{7}\NormalTok{)]))  }\SpecialCharTok{+}
     \FunctionTok{labs}\NormalTok{(}\AttributeTok{title=}\StringTok{\textquotesingle{}Precision \& recall rates\textquotesingle{}}\NormalTok{,}
          \AttributeTok{subtitle=}\StringTok{\textquotesingle{}as functions of the cutoff\textquotesingle{}}\NormalTok{,}
          \AttributeTok{x=}\StringTok{\textquotesingle{}Cutoff\textquotesingle{}}\NormalTok{, }\AttributeTok{y=}\StringTok{\textquotesingle{}\textquotesingle{}}\NormalTok{) }\SpecialCharTok{+}
@@ -989,8 +1023,6 @@ Let us look at the confusion matrix:
 \begin{Highlighting}[]
 \NormalTok{conf\_mat\_logreg\_train }\OtherTok{\textless{}{-}} 
   \FunctionTok{confusion\_matrix}\NormalTok{(logreg, train\_bin\_cv, }\AttributeTok{col =} \StringTok{"is\_fraud"}\NormalTok{, }\AttributeTok{cutoff =} \FloatTok{0.003}\NormalTok{)}
-\NormalTok{conf\_mat\_logreg\_valid }\OtherTok{\textless{}{-}} 
-  \FunctionTok{confusion\_matrix}\NormalTok{(logreg, valid\_bin\_cv, }\AttributeTok{col =} \StringTok{"is\_fraud"}\NormalTok{, }\AttributeTok{cutoff =} \FloatTok{0.003}\NormalTok{)}
 \NormalTok{conf\_mat\_logreg\_train}
 \end{Highlighting}
 \end{Shaded}
@@ -1001,6 +1033,8 @@ Let us look at the confusion matrix:
 
 \begin{Shaded}
 \begin{Highlighting}[]
+\NormalTok{conf\_mat\_logreg\_valid }\OtherTok{\textless{}{-}} 
+  \FunctionTok{confusion\_matrix}\NormalTok{(logreg, valid\_bin\_cv, }\AttributeTok{col =} \StringTok{"is\_fraud"}\NormalTok{, }\AttributeTok{cutoff =} \FloatTok{0.003}\NormalTok{)}
 \NormalTok{conf\_mat\_logreg\_valid}
 \end{Highlighting}
 \end{Shaded}
@@ -1064,8 +1098,9 @@ Calculate a percentage of variance explained by each PCA component.
 \caption{\label{Fig:pca_plot}Variance for each PCs}
 \end{figure}
 
-As we can see first three components account the most of the variance of
-the data, but the third component could be also valuable for a model.
+As we can see from the Figure \ref{Fig:pca_plot} first three components
+account the most of the variance of the data, but the third component
+could be also valuable for a model.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1133,8 +1168,6 @@ the data, but the third component could be also valuable for a model.
 \begin{Highlighting}[]
 \NormalTok{conf\_mat\_logreg\_PCA\_train }\OtherTok{\textless{}{-}} 
   \FunctionTok{confusion\_matrix}\NormalTok{(logreg\_PCA, train\_bin\_cv\_pca, }\AttributeTok{col =} \StringTok{"is\_fraud"}\NormalTok{, }\AttributeTok{cutoff =} \FloatTok{0.0025}\NormalTok{)}
-\NormalTok{conf\_mat\_logreg\_PCA\_valid }\OtherTok{\textless{}{-}} 
-  \FunctionTok{confusion\_matrix}\NormalTok{(logreg\_PCA, valid\_bin\_cv\_pca, }\AttributeTok{col =} \StringTok{"is\_fraud"}\NormalTok{, }\AttributeTok{cutoff =} \FloatTok{0.0025}\NormalTok{)}
 \NormalTok{conf\_mat\_logreg\_PCA\_train}
 \end{Highlighting}
 \end{Shaded}
@@ -1145,6 +1178,8 @@ the data, but the third component could be also valuable for a model.
 
 \begin{Shaded}
 \begin{Highlighting}[]
+\NormalTok{conf\_mat\_logreg\_PCA\_valid }\OtherTok{\textless{}{-}} 
+  \FunctionTok{confusion\_matrix}\NormalTok{(logreg\_PCA, valid\_bin\_cv\_pca, }\AttributeTok{col =} \StringTok{"is\_fraud"}\NormalTok{, }\AttributeTok{cutoff =} \FloatTok{0.0025}\NormalTok{)}
 \NormalTok{conf\_mat\_logreg\_PCA\_valid}
 \end{Highlighting}
 \end{Shaded}
@@ -1203,9 +1238,10 @@ this parameter we will use a function called \texttt{find\_classwt}:
 \NormalTok{  metrics\_long }\OtherTok{\textless{}{-}} \FunctionTok{melt}\NormalTok{(metrics, }\AttributeTok{id=}\StringTok{\textquotesingle{}weights\textquotesingle{}}\NormalTok{)}
 \NormalTok{  pl }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(}\AttributeTok{data=}\NormalTok{metrics\_long, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{weights, }\AttributeTok{y=}\NormalTok{value, }\AttributeTok{colour=}\NormalTok{variable)) }\SpecialCharTok{+}
     \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{size=}\DecValTok{1}\NormalTok{) }\SpecialCharTok{+}
-    \FunctionTok{scale\_colour\_discrete}\NormalTok{(}\AttributeTok{name =}\StringTok{"Metric"}\NormalTok{,}
-                          \AttributeTok{breaks=}\FunctionTok{c}\NormalTok{(}\StringTok{"precisions"}\NormalTok{, }\StringTok{"recalls"}\NormalTok{),}
-                          \AttributeTok{labels=}\FunctionTok{c}\NormalTok{(}\StringTok{"Precision"}\NormalTok{, }\StringTok{"Recall"}\NormalTok{)) }\SpecialCharTok{+}
+    \FunctionTok{scale\_colour\_manual}\NormalTok{(}\StringTok{"Metric"}\NormalTok{, }
+                        \AttributeTok{breaks=}\FunctionTok{c}\NormalTok{(}\StringTok{"precisions"}\NormalTok{, }\StringTok{"recalls"}\NormalTok{),}
+                        \AttributeTok{labels=}\FunctionTok{c}\NormalTok{(}\StringTok{"Precision"}\NormalTok{, }\StringTok{"Recall"}\NormalTok{),}
+                        \AttributeTok{values =} \FunctionTok{c}\NormalTok{(my\_palette[}\FunctionTok{c}\NormalTok{(}\DecValTok{4}\NormalTok{,}\DecValTok{7}\NormalTok{)]))  }\SpecialCharTok{+}
     \FunctionTok{labs}\NormalTok{(}\AttributeTok{title=}\StringTok{\textquotesingle{}Precision \& recall rates\textquotesingle{}}\NormalTok{,}
          \AttributeTok{subtitle=}\StringTok{\textquotesingle{}as functions of the class weight (weight of the "0" class)\textquotesingle{}}\NormalTok{,}
          \AttributeTok{x=}\StringTok{\textquotesingle{}weight\textquotesingle{}}\NormalTok{, }\AttributeTok{y=}\StringTok{\textquotesingle{}\textquotesingle{}}\NormalTok{) }\SpecialCharTok{+}
@@ -1258,7 +1294,6 @@ We will take a look at the confusion matrix:
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{conf\_mat\_forest\_train }\OtherTok{\textless{}{-}} \FunctionTok{confusion\_matrix}\NormalTok{(forest, train\_cv, }\StringTok{\textquotesingle{}is\_fraud\textquotesingle{}}\NormalTok{, }\AttributeTok{model\_type =} \StringTok{"forest"}\NormalTok{)}
-\NormalTok{conf\_mat\_forest\_valid }\OtherTok{\textless{}{-}} \FunctionTok{confusion\_matrix}\NormalTok{(forest, valid\_cv, }\StringTok{\textquotesingle{}is\_fraud\textquotesingle{}}\NormalTok{, }\AttributeTok{model\_type =} \StringTok{"forest"}\NormalTok{)}
 \NormalTok{conf\_mat\_forest\_train}
 \end{Highlighting}
 \end{Shaded}
@@ -1269,6 +1304,7 @@ We will take a look at the confusion matrix:
 
 \begin{Shaded}
 \begin{Highlighting}[]
+\NormalTok{conf\_mat\_forest\_valid }\OtherTok{\textless{}{-}} \FunctionTok{confusion\_matrix}\NormalTok{(forest, valid\_cv, }\StringTok{\textquotesingle{}is\_fraud\textquotesingle{}}\NormalTok{, }\AttributeTok{model\_type =} \StringTok{"forest"}\NormalTok{)}
 \NormalTok{conf\_mat\_forest\_valid}
 \end{Highlighting}
 \end{Shaded}
@@ -1294,7 +1330,7 @@ interpretation.
 \section{Logistic regression}\label{logistic-regression-1}}
 
 First, we will take a look at the logistic regression. To do that, we
-will sample a subset of our data, containing \(100000\) observations.
+will sample a subset of our data, containing \(100'000\) observations.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1339,12 +1375,45 @@ will sample a subset of our data, containing \(100000\) observations.
                                    \AttributeTok{precisions =}\NormalTok{ precisions\_train),}
                         \FunctionTok{data.table}\NormalTok{(}\AttributeTok{model =} \StringTok{\textquotesingle{}test\_data\textquotesingle{}}\NormalTok{, }
                                    \AttributeTok{precisions =}\NormalTok{ precisions\_test))}
+\end{Highlighting}
+\end{Shaded}
+
+To visualize the result we prepared a funtion which return a plot of
+density for metrics precision and recall.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Cross{-}validation density of metrics}
+\NormalTok{cv\_metrics\_plt }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(metrics, }\AttributeTok{model\_nm =} \StringTok{"logistic regression"}\NormalTok{) \{}
+  
+\NormalTok{  metric\_nm }\OtherTok{\textless{}{-}} \FunctionTok{names}\NormalTok{(metrics)[}\DecValTok{2}\NormalTok{]}
+\NormalTok{  title\_nm }\OtherTok{\textless{}{-}} \FunctionTok{paste0}\NormalTok{(}\StringTok{"Density plot for "}\NormalTok{, metric\_nm)}
+\NormalTok{  subtitle\_nm }\OtherTok{\textless{}{-}} \FunctionTok{paste0}\NormalTok{(}\StringTok{"for "}\NormalTok{, model\_nm)}
+  
+\NormalTok{  plt }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(}\FunctionTok{as.data.frame}\NormalTok{(metrics), }\FunctionTok{aes}\NormalTok{(}\FunctionTok{get}\NormalTok{(metric\_nm), }\AttributeTok{colour =}\NormalTok{ model, }\AttributeTok{fill =}\NormalTok{ model)) }\SpecialCharTok{+}
+    \FunctionTok{geom\_density}\NormalTok{(}\AttributeTok{alpha =} \FloatTok{0.7}\NormalTok{) }\SpecialCharTok{+}
+    \FunctionTok{theme\_light}\NormalTok{() }\SpecialCharTok{+}
+    \FunctionTok{theme}\NormalTok{(}
+      \AttributeTok{plot.subtitle =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size =}\NormalTok{ text\_size }\SpecialCharTok{{-}} \DecValTok{4}\NormalTok{, }\AttributeTok{colour=}\StringTok{\textquotesingle{}black\textquotesingle{}}\NormalTok{),}
+      \AttributeTok{plot.title =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size =}\NormalTok{ text\_size, }\AttributeTok{face =} \StringTok{\textquotesingle{}bold\textquotesingle{}}\NormalTok{),}
+      \AttributeTok{axis.text=}\FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size=}\NormalTok{text\_size }\SpecialCharTok{{-}} \DecValTok{4}\NormalTok{), }
+      \AttributeTok{axis.title.y =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size =}\NormalTok{ text\_size }\SpecialCharTok{{-}} \DecValTok{4}\NormalTok{), }
+      \AttributeTok{axis.title.x =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{size =}\NormalTok{ text\_size }\SpecialCharTok{{-}} \DecValTok{4}\NormalTok{)}
+\NormalTok{    ) }\SpecialCharTok{+}
+    \FunctionTok{scale\_fill\_manual}\NormalTok{(}\AttributeTok{values =} \FunctionTok{c}\NormalTok{(my\_palette[}\FunctionTok{c}\NormalTok{(}\DecValTok{4}\NormalTok{,}\DecValTok{7}\NormalTok{)]))  }\SpecialCharTok{+} 
+    \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =}\NormalTok{ title\_nm,}
+         \AttributeTok{subtitle =}\NormalTok{ subtitle\_nm,}
+         \AttributeTok{y =} \StringTok{""}\NormalTok{,}
+         \AttributeTok{x =}\NormalTok{ metric\_nm)}
+  
+  \FunctionTok{return}\NormalTok{(plt)}
+\NormalTok{\}}
 
 \FunctionTok{cv\_metrics\_plt}\NormalTok{(recalls\_all, }\StringTok{"logistic regression"}\NormalTok{)}
 \end{Highlighting}
 \end{Shaded}
 
-\includegraphics{credit_card_fraud_detection_files/figure-latex/cv_logreg-1.pdf}
+\includegraphics{credit_card_fraud_detection_files/figure-latex/cv_metrics_plt-1.pdf}
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1352,8 +1421,7 @@ will sample a subset of our data, containing \(100000\) observations.
 \end{Highlighting}
 \end{Shaded}
 
-\includegraphics{credit_card_fraud_detection_files/figure-latex/cv_logreg-2.pdf}
-
+\includegraphics{credit_card_fraud_detection_files/figure-latex/cv_metrics_plt-2.pdf}
 We can see on the density plots, that recall is high, the density for
 the testing set is wider, but no serious overfitting can be seen. The
 precision is very low, but also the densities for the training and the
@@ -1424,6 +1492,131 @@ be seen on the recall, which is not surprising, because we were focusing
 on finding the parameters that maximize this metric, so the model is not
 as robust as it should be.
 
+\hypertarget{testing-dataset}{%
+\chapter{Testing dataset}\label{testing-dataset}}
+
+Finally, to provide an unbiased evaluation of a final models fit, we
+check models performance on independent testing dataset. Similarly, as
+in previous Section we will not analyse logistic regression with PCA,
+because of poor output comparing with the basic logistic regression.
+
+We created functions used to data preprocessing, before fit the models.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Data preprocessing used for test dataset (random forest) }
+\NormalTok{data\_preprocess\_forest }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(data) \{}
+  
+  \CommentTok{\# Select useful columns}
+\NormalTok{  data }\OtherTok{\textless{}{-}}\NormalTok{ data }\SpecialCharTok{\%\textgreater{}\%}
+\NormalTok{    .[,}\FunctionTok{c}\NormalTok{(}\StringTok{"is\_fraud"}\NormalTok{, }\StringTok{"category"}\NormalTok{, }\StringTok{"amt"}\NormalTok{, }\StringTok{"trans\_date\_trans\_time"}\NormalTok{, }\StringTok{"dob"}\NormalTok{)]}
+  
+  \CommentTok{\# Convert into factors}
+\NormalTok{  dt }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{( }\StringTok{"category"}\NormalTok{, }\StringTok{"is\_fraud"}\NormalTok{)}
+\NormalTok{  data[,(dt)}\SpecialCharTok{:}\ErrorTok{=} \FunctionTok{lapply}\NormalTok{(.SD, as.factor), .SDcols }\OtherTok{=}\NormalTok{ dt]}
+  
+  \CommentTok{\# Convert into data class}
+\NormalTok{  data[, trans\_date\_trans\_time }\SpecialCharTok{:}\ErrorTok{=} \FunctionTok{strptime}\NormalTok{(trans\_date\_trans\_time,}
+                                           \AttributeTok{format =}\StringTok{"\%Y{-}\%m{-}\%d \%H:\%M:\%OS"}\NormalTok{, }
+                                           \AttributeTok{tz =} \StringTok{"EST"}\NormalTok{)]}
+  \CommentTok{\# Compute age of the customer in a day of transaction}
+\NormalTok{  data[, age }\SpecialCharTok{:}\ErrorTok{=} \FunctionTok{round}\NormalTok{(}\FunctionTok{as.numeric}\NormalTok{(}\FunctionTok{difftime}\NormalTok{(trans\_date\_trans\_time, dob, }\AttributeTok{units =} \StringTok{"days"}\NormalTok{)}\SpecialCharTok{/}\DecValTok{365}\NormalTok{), }\DecValTok{0}\NormalTok{)]}
+  \CommentTok{\# Adding a weekday of transaction}
+\NormalTok{  data[, week\_day\_of\_trans }\SpecialCharTok{:}\ErrorTok{=} \FunctionTok{as.factor}\NormalTok{(}\FunctionTok{wday}\NormalTok{(trans\_date\_trans\_time))]}
+  \CommentTok{\# Hour of the transaction}
+\NormalTok{  data[, trans\_hour }\SpecialCharTok{:}\ErrorTok{=} \FunctionTok{as\_factor}\NormalTok{(}\FunctionTok{strftime}\NormalTok{(trans\_date\_trans\_time, }
+                                          \AttributeTok{format=}\StringTok{"\%H"}\NormalTok{, }
+                                          \AttributeTok{tz =} \StringTok{"EST"}\NormalTok{))]}
+  \CommentTok{\# Adding bin variables}
+\NormalTok{  data[, weekday\_fraud }\SpecialCharTok{:}\ErrorTok{=} \FunctionTok{if\_else}\NormalTok{(week\_day\_of\_trans }\SpecialCharTok{\%in\%} \DecValTok{4}\SpecialCharTok{:}\DecValTok{7}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{)]}
+\NormalTok{  data[, category\_fraud }\SpecialCharTok{:}\ErrorTok{=} 
+         \FunctionTok{if\_else}\NormalTok{(category }\SpecialCharTok{\%in\%} \FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}grocery\_pos\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}misc\_net\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}shopping\_net\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}shopping\_pos\textquotesingle{}}\NormalTok{),}\DecValTok{1}\NormalTok{,}\DecValTok{0}\NormalTok{)]}
+\NormalTok{  data[, hour\_fraud }\SpecialCharTok{:}\ErrorTok{=} 
+         \FunctionTok{if\_else}\NormalTok{(trans\_hour }\SpecialCharTok{\%in\%} \FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}00\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}01\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}02\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}03\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}22\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}23\textquotesingle{}}\NormalTok{), }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{)]}
+\NormalTok{  data[,}\FunctionTok{c}\NormalTok{(}\StringTok{"weekday\_fraud"}\NormalTok{, }\StringTok{"category\_fraud"}\NormalTok{, }\StringTok{"hour\_fraud"}\NormalTok{)}\SpecialCharTok{:}\ErrorTok{=} 
+         \FunctionTok{lapply}\NormalTok{(.SD, as.factor), .SDcols }\OtherTok{=} \FunctionTok{c}\NormalTok{(}\StringTok{"weekday\_fraud"}\NormalTok{, }\StringTok{"category\_fraud"}\NormalTok{, }\StringTok{"hour\_fraud"}\NormalTok{)]}
+  
+  \FunctionTok{return}\NormalTok{(data)}
+\NormalTok{\}}
+
+\CommentTok{\# Data preprocessing used for test dataset (logistic regression) }
+\NormalTok{data\_preprocess\_logreg }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(data) \{}
+  
+  \CommentTok{\# Same data manipulation as for random forest}
+\NormalTok{  data }\OtherTok{\textless{}{-}} \FunctionTok{data\_preprocess\_forest}\NormalTok{(data)}
+  \CommentTok{\# Normalization}
+\NormalTok{  temp }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}amt\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}age\textquotesingle{}}\NormalTok{)}
+\NormalTok{  data[, (temp) }\SpecialCharTok{:}\ErrorTok{=} \FunctionTok{lapply}\NormalTok{(.SD, min\_max\_norm), .SDcols }\OtherTok{=}\NormalTok{ temp]}
+  
+  \FunctionTok{return}\NormalTok{(data)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\hypertarget{logistic-regression-2}{%
+\section{Logistic regression}\label{logistic-regression-2}}
+
+Performance check on testing dataset for logistic regression.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Logistic regression}
+\NormalTok{data\_test\_logreg }\OtherTok{\textless{}{-}} \FunctionTok{data\_preprocess\_logreg}\NormalTok{(data\_test)}
+\NormalTok{logreg }\OtherTok{\textless{}{-}} \FunctionTok{glm}\NormalTok{(is\_fraud }\SpecialCharTok{\textasciitilde{}} 
+\NormalTok{                category\_fraud }\SpecialCharTok{+}\NormalTok{ amt }\SpecialCharTok{+}\NormalTok{ hour\_fraud }\SpecialCharTok{+}\NormalTok{ age}\SpecialCharTok{:}\NormalTok{hour\_fraud }\SpecialCharTok{+}\NormalTok{ amt}\SpecialCharTok{:}\NormalTok{hour\_fraud }\SpecialCharTok{+}\NormalTok{ amt}\SpecialCharTok{:}\NormalTok{category\_fraud }\SpecialCharTok{+}\NormalTok{ age}\SpecialCharTok{:}\NormalTok{category\_fraud,}
+              \AttributeTok{data =}\NormalTok{ data\_test\_logreg, }
+              \AttributeTok{family =}\NormalTok{ binomial)}
+\end{Highlighting}
+\end{Shaded}
+
+We will take a look at the confusion matrix:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{conf\_mat\_logreg\_test }\OtherTok{\textless{}{-}} \FunctionTok{confusion\_matrix}\NormalTok{(logreg, data\_test\_logreg, }\AttributeTok{col =} \StringTok{"is\_fraud"}\NormalTok{, }\AttributeTok{cutoff =} \FloatTok{0.003}\NormalTok{)}
+\NormalTok{conf\_mat\_logreg\_test}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 0.01467141 0.90163170
+\end{verbatim}
+
+The model gives outcomes on testing data set: recall equals 0.902 and
+precision is 0.015.
+
+\hypertarget{random-forest-2}{%
+\section{Random forest}\label{random-forest-2}}
+
+Performance check on testing dataset for random forest.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Random forest}
+\NormalTok{data\_test\_forest }\OtherTok{\textless{}{-}} \FunctionTok{data\_preprocess\_forest}\NormalTok{(data\_test)}
+\NormalTok{forest }\OtherTok{\textless{}{-}} \FunctionTok{randomForest}\NormalTok{(}\FunctionTok{as\_factor}\NormalTok{(is\_fraud) }\SpecialCharTok{\textasciitilde{}}\NormalTok{ amt }\SpecialCharTok{+}\NormalTok{ age }\SpecialCharTok{+}\NormalTok{ category\_fraud }\SpecialCharTok{+}\NormalTok{ hour\_fraud,}
+              \AttributeTok{data =}\NormalTok{ data\_test\_forest, }
+              \AttributeTok{ntree=}\DecValTok{100}\NormalTok{, }
+              \AttributeTok{classwt =} \FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}0\textquotesingle{}} \OtherTok{=} \FloatTok{0.25}\NormalTok{, }\StringTok{\textquotesingle{}1\textquotesingle{}} \OtherTok{=} \FloatTok{0.75}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+We will take a look at the confusion matrix:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{conf\_mat\_forest\_test }\OtherTok{\textless{}{-}} \FunctionTok{confusion\_matrix}\NormalTok{(forest, data\_test\_forest, }\AttributeTok{col =} \StringTok{"is\_fraud"}\NormalTok{, }\AttributeTok{cutoff =} \FloatTok{0.0025}\NormalTok{, }\AttributeTok{model\_type =} \StringTok{"forest"}\NormalTok{)}
+\NormalTok{conf\_mat\_forest\_test}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 0.06196626 0.96410256
+\end{verbatim}
+
+The model gives outcomes on the testing data set: recall equals 0.964
+and precision is 0.062.
+
 \hypertarget{conclusion}{%
 \chapter{Conclusion}\label{conclusion}}
 
@@ -1477,8 +1670,8 @@ Precision\_test
 \midrule()
 \endhead
 logistic regression & not overfited & 0.928 & 0.022 & 0.902 & 0.015 \\
-random forest & significantly overfited & 0.972 & 0.076 & 0.911 &
-0.015 \\
+random forest & significantly overfited & 0.972 & 0.076 & 0.964 &
+0.062 \\
 \bottomrule()
 \end{longtable}
 
