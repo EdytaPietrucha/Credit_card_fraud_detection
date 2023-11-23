@@ -1,4 +1,4 @@
-# dev.off()
+dev.off()
 main_path <- dirname(rstudioapi::getActiveDocumentContext()$path)
 setwd(main_path)
 
@@ -6,7 +6,8 @@ source("libraries.R")
 source("functions.R")
 
 #### Source data  --------------------------------------------------------------
-data_train <- fread(paste0(main_path,"/Data/fraudTrain.csv"))
+# data_train <- fread(paste0(main_path,"/Data/fraudTrain.csv"))
+data_train <- fread("C:/Users/edyta/Desktop/GitHub/repos/credit_card_fraud_detection//Data/fraudTrain.csv")
 dim(data_train)
 
 #### Data preprocessing  -------------------------------------------------------
@@ -27,9 +28,9 @@ data_train[, trans_date_trans_time := strptime(trans_date_trans_time,
                                                format ="%Y-%m-%d %H:%M:%OS", 
                                                tz = "EST")]
 
-# Compute age of the customer ina day of transaction
+#### Exploratory Data Analysis  ------------------------------------------------
+# Compute age of the customer in a day of transaction
 data_train[, age := round(as.numeric(difftime(trans_date_trans_time, dob, units = "days")/365), 0)]
-
 
 text_size <- 20
 # customize my_style settings
@@ -58,7 +59,6 @@ ggplot(data_train, aes(x = is_fraud, y = age)) +
        subtitle="group by not-fraudulent transactions and fraudulent transactions")
   
 # Frequency of fraudulant transaction group by gender
-
 gender_fraud <- data_train %>% 
   .[, .(count = .N), by = c("gender", "is_fraud")] %>%
   .[, .(is_fraud, freq = count/sum(count)), by = gender] %>%
@@ -190,19 +190,20 @@ min_max_norm <- function(x) {
 }
 
 temp <- c('amt','city_pop','age','dist')
-data_train_bin <- data_train
-data_train_bin <- data_train_bin[, ..temp] %>% 
-  apply(2, function(x) min_max_norm(x)) %>%
-  as.data.table() %>% 
-  cbind(data_train_bin %>% .[, -..temp])
-# data_train_bin[, (temp) := lapply(.SD, min_max_norm), .SDcols = temp] # reference!
+data_train_bin <- copy(data_train)
+# data_train_bin <- data_train_bin[, ..temp] %>% 
+#   apply(2, function(x) min_max_norm(x)) %>%
+#   as.data.table() %>% 
+#   cbind(data_train_bin %>% 
+#           .[, -..temp])
+data_train_bin[, (temp) := lapply(.SD, min_max_norm), .SDcols = temp] # reference!
 
 # Correlation
 cor(data_train[, ..temp])
 ggcorr(data_train[, ..temp], label = T)
 corrplot::corrplot(cor(data_train[, ..temp]), method = 'number')
 
-# Fitting logistic regression 
+####  Logistic regression  -----------------------------------------------------
 data_train_bin_cv <- resample_partition(data_train_bin, p = c(valid = 0.3, train = 0.7))
 train_bin_cv <- data_train_bin[data_train_bin_cv$train$idx,]
 valid_bin_cv <- data_train_bin[data_train_bin_cv$valid$idx,]
@@ -283,7 +284,7 @@ find_cutoff <- function(model, data, target_variable, min_cutoff=0.1, max_cutoff
 
 cutoff_lvl <- find_cutoff(logreg, train_bin_cv, 'is_fraud', 0.001, 0.1, 0.001)
 
-# Logistic regression with PCA
+#### Logistic regression with PCA ----------------------------------------------
 
 # remove dependent variable from dataset and keep only numerical variables
 numerical_cols <- c('amt', 'city_pop', 'age', 'dist', 'weekday_fraud', 'category_fraud', 'hour_fraud')
@@ -323,7 +324,7 @@ cutoff_lvl_pca <- find_cutoff(logreg_PCA, train_bin_cv_pca, 'is_fraud', 0.001, 0
 confusion_matrix(logreg_PCA, train_bin_cv_pca, col = "is_fraud", cutoff = 0.003)
 confusion_matrix(logreg_PCA, valid_bin_cv_pca, col = "is_fraud", cutoff = 0.003)
 
-# Random forest
+#### Random forest -------------------------------------------------------------
 # CV on unnormalized data
 train_cv <- data_train[data_train_bin_cv$train$idx,]
 valid_cv <- data_train[data_train_bin_cv$valid$idx,]
@@ -485,17 +486,4 @@ precisions_all <- rbind(tibble(model = 'train_data', precisions = precisions_tra
 # Density plot of metrics
 cv_metrics_plt(recalls_all, "random forest")
 cv_metrics_plt(precisions_all, "random forest")
-
-
-
-
-
-
-
-
-
-
-
-
-
 
